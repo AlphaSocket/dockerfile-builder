@@ -9,7 +9,7 @@ before_install:
   - docker build -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} .
 
 script:
-${TEST_PROCESSES}
+${TRAVIS_PROCESSES}
 
 after_success:
   - if [ "$DOCKER_USERNAME" ]; then

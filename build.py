@@ -79,23 +79,26 @@ class Builder():
 
             export_var('DOCKERFILE_BUILDER_IMPORTS', concat)
 
-
-
-    def import_processes(self, stage, commands_prefix="", row_prefix=""):
+    def build_processes(self, stage, commands_prefix="", row_prefix=""):
+        # Gather processes
         processes = self.conf[stage]['processes']
+        # Concat processes
+        imploded_processes = self.implode_processes(processes,commands_prefix,row_prefix)
+        # Expand env vars in test files ( Outside container env )
+        if stage in [ 'test', 'travis']:
+            imploded_processes = os.path.expandvars(imploded_processes)
+        # Export var to env
+        export_var('{stage}_PROCESSES'.format(stage=stage.upper()), imploded_processes)
+
+    # Implode processes
+    def implode_processes(self, processes, commands_prefix="", row_prefix=""):
         concat = ""
 
         for process in processes:
             concat += "# {title}\n".format(title=process['title'])
 
             commands = ""
-            # for command in process['commands']:
-            #     if 'shell_condition' in process:
-            #         commands += "    {row_prefix}".format(row_prefix=row_prefix)
-            #     else:
-            #         commands += commands_prefix
-            #     commands +=  "{command}\n".format(command=command)
-            #     
+
             for command in process['commands']:
                 if 'shell_condition' in process:
                     commands += "    {row_prefix}".format(row_prefix=row_prefix)
@@ -120,10 +123,8 @@ class Builder():
                         )
             else:
                 concat += commands + "\n"
-            #concat = os.path.expandvars(concat)
-
-        export_var('{stage}_PROCESSES'.format(stage=stage.upper()), concat)
-
+        return concat
+            
     def eval_template(self, template):
 
         template_file = GLOBALS['locations']['dockerfile-builder'] + '/' + GLOBALS['dockerfile-builder']['folders']['templates'] + '/' + GLOBALS['dockerfile-builder']['templates'][template]
@@ -162,13 +163,16 @@ class Builder():
         self.import_env('dockerfile_builder')
         self.import_files('dockerfile_builder')
 
-
     #def build(self):
 
         # Import build config
         build_yaml = get_path("{}/{}".format( GLOBALS['locations']['pwd'], GLOBALS['dockerfile-builder']['config']['file']['name'] ))
         self.conf = get_data_from_yaml(build_yaml,True)
 
+
+        #
+        # ENV
+        #
         print_message('Importing enviroment variables')
         # Build env vars
         self.import_env('general')
@@ -181,18 +185,33 @@ class Builder():
         # Build config vars
         self.import_env('test')
 
+        #
+        # IMPORT
+        #
         print_message('Importing files in build')
-
         self.import_files('build')
 
+        #
+        # PROCESSES
+        #
         print_message('Importing processes')
-        # Import setup processes
-        self.import_processes('setup')
-        # Import config processes
-        self.import_processes('config')
-        # Import test processes
-        self.import_processes('test', ' - ', "    ")
+        # Build setup processes
+        self.build_processes('setup')
+        # Build config processes
+        self.build_processes('config')
+        # Build test processes
+        self.build_processes('test')
 
+        # Duplicate test for travis 
+        self.conf['travis'] = self.conf['test']
+        # Build travis processes
+        self.build_processes('travis', ' - ', "    ")
+
+
+        #
+        # BUILD
+        #
+        
         # Build env file
         print_message('Building enviroment file')
 
@@ -240,10 +259,12 @@ class Builder():
         self.eval_template('dockerfile')#GLOBALS['dockerfile-builder']['templates']['dockerfile'], GLOBALS['dockerfile-builder']['target']['path']['dockerfile'])
 
         # Build test file
-        print_message('Building travis file')
-
+        print_message('Building test file')
         self.eval_template('test')
-
+        
+        # Build travis
+        print_message('Building travis file')
+        self.eval_template('travis')
         print_message('Verify travis file')
 
         self.verify_test_file()
