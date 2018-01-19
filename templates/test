@@ -1,7 +1,18 @@
 #!/bin/sh
 
+#
+# Local test script to build and test docker image
+#
+
 # exit if a command fails
 set -e
+
+CURL=$(which curl)
+
+if [ CURL = '' ]; then
+    echo 'The package curl is required\n'
+    exit 1
+fi
 
 ${TEST_PROCESSES}
 

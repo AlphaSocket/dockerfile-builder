@@ -16,7 +16,8 @@ dockerfile-builder:
     setup: "setup"
     config: "config"
     dockerfile: "Dockerfile"
-    test: "travis"
+    test: "test"
+    travis: "travis"
   envvars:
     paths:
       target:
@@ -24,7 +25,8 @@ dockerfile-builder:
         env: "envvars"
         setup: "bin/setup"
         config: "bin/config"
-        test: ".travis.yml"
+        test: "test"
+        travis: ".travis.yml"
       dockerfile:
         env: "/usr/local/envvars"
         setup: "/usr/local/bin/setup"
