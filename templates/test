@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# exit if a command fails
+set -e
+
+${TEST_PROCESSES}
+
+exit 0

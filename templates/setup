@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+
+# exit if a command fails
+set -e
+
+${SETUP_PROCESSES}
+
+exit 0

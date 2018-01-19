@@ -1,0 +1,35 @@
+#
+# GLOBALS
+#
+locations:
+  dockerfile-builder: 
+    valueFromCommand: "dirname $(realpath $(which dockerfile-build))"
+
+dockerfile-builder:
+  folders:
+    templates: "templates"
+  config:
+    file:
+      name: "dockerfile-builder.yaml"
+  templates:
+    env: "env"
+    setup: "setup"
+    config: "config"
+    dockerfile: "Dockerfile"
+    test: "travis"
+  envvars:
+    paths:
+      target:
+        dockerfile: "Dockerfile"
+        env: "envvars"
+        setup: "bin/setup"
+        config: "bin/config"
+        test: ".travis.yml"
+      dockerfile:
+        env: "/usr/local/envvars"
+        setup: "/usr/local/bin/setup"
+        config: "/usr/local/bin/config"
+  import:
+    0: envvars:/usr/local/envvars
+    1: bin/setup:/usr/local/bin/setup
+    2: bin/config:/usr/local/bin/config

@@ -1,0 +1,18 @@
+sudo: required
+
+services:
+  - docker
+
+before_install:
+  - sudo apt update && sudo apt install curl libfcgi0ldbl -y
+  - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD" $DOCKER_REGISTER;
+  - docker build -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} .
+
+script:
+${TEST_PROCESSES}
+
+after_success:
+  - if [ "$DOCKER_USERNAME" ]; then
+        docker tag ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} ${DOCKER_REGISTER}/${DOCKER_USERNAME}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION};
+        docker push ${DOCKER_REGISTER}/${DOCKER_USERNAME}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION};
+    fi
