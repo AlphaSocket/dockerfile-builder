@@ -8,12 +8,29 @@
 set -e
 
 CURL=$(which curl)
+DOCKER=$(which docker)
 
 if [ CURL = '' ]; then
     echo 'The package curl is required\n'
     exit 1
 fi
 
+if [ DOCKER = '' ]; then
+    echo 'Docker is required\n'
+    exit 1
+fi
+
+echo "#\n# Building image\n#\n"
+docker build --no-cache -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} .
+
+echo "#\n# Cleaning docker\n#\n"
+running_containers=$(docker ps -aq)
+if [ "$running_containers" ] 
+    then
+        docker stop $running_containers -t 0 && docker system prune -f
+fi
+
+echo "#\n# Running test\n#\n"
 ${TEST_PROCESSES}
 
 exit 0

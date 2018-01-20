@@ -12,20 +12,27 @@ dockerfile-builder:
     file:
       name: "dockerfile-builder.yaml"
   templates:
+    dockerfile: "Dockerfile"
+    dockerignore: ".dockerignore"
+    readme: "README.md"
+    gitignore: ".gitignore"
     env: "env"
     setup: "setup"
     config: "config"
-    dockerfile: "Dockerfile"
     test: "test"
     travis: "travis"
   envvars:
     paths:
       target:
         dockerfile: "Dockerfile"
+        dockerignore: ".dockerignore"
+        gitignore: ".gitignore"
+        readme: "README.md"
         env: "envvars"
         setup: "bin/setup"
         config: "bin/config"
         test: "test"
+        travis: ".travis.yml"
         travis: ".travis.yml"
       dockerfile:
         env: "/usr/local/envvars"
