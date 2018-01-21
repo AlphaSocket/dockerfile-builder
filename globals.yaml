@@ -15,7 +15,7 @@ dockerfile-builder:
     dockerfile: "Dockerfile"
     dockerignore: ".dockerignore"
     readme: "README.md"
-    gitignore: ".gitignore"
+    master_gitignore: "master.gitignore"
     env: "env"
     setup: "setup"
     config: "config"
@@ -26,7 +26,7 @@ dockerfile-builder:
       target:
         dockerfile: "Dockerfile"
         dockerignore: ".dockerignore"
-        gitignore: ".gitignore"
+        master_gitignore: ".gitignore"
         readme: "README.md"
         env: "envvars"
         setup: "bin/setup"

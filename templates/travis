@@ -5,7 +5,12 @@ services:
 
 before_install:
   - sudo apt update && sudo apt install curl libfcgi0ldbl -y
-  - docker build -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} .
+  - docker build \
+        --no-cache \
+        -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} \
+        --build-arg BUILD_COMMIT=`git rev-parse --short HEAD` \
+        --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+        .
 
 script:
 ${TRAVIS_PROCESSES}

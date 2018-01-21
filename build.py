@@ -150,6 +150,41 @@ class Builder():
             print_error('Invalid travis file')
             exit(1)
 
+    def create_readme(self):
+        os.environ['PROJECT_TITLE'] = self.conf['project']['title']
+        os.environ['PROJECT_CODENAME'] = self.conf['project']['codename']
+        os.environ['PROJECT_DESCRIPTION'] = self.conf['project']['description']
+        
+        # Version 
+        if os.environ['BUILD_BRANCH'] == 'master':
+            os.environ['PROJECT_VERSION'] = "latest"
+        else:
+            os.environ['PROJECT_VERSION'] = os.environ['TEST_DOCKERFILE_TAG_VERSION']
+
+        # Format versions
+        branches = get_command_output("git for-each-ref --format='%(refname:short)' refs/heads/").split("\n")
+        concat = ""
+        for line in branches:
+            if "master" != line:
+                concat += "- {line}".format(line=line)
+        os.environ['PROJECT_VERSIONS'] = concat
+
+        # Configurable envvars
+        os.environ['PROJECT_CONF_ENVVARS'] = os.environ['DOCKERFILE_BUILDER_CONFIG_ENVVARS']
+
+        # Format dependencies
+        os.environ['PROJECT_PACKAGES'] = ""
+        for stage in ['setup', 'config']:
+            label = 'SETUP_DEPENDENCIES_{ucstage}'.format(ucstage=stage.upper())
+            dependencies = str(os.environ[label]).split(' ')
+            if bool(dependencies):
+                os.environ['PROJECT_PACKAGES'] += "- {stage} dependencies:\n".format(stage=stage.title())
+                for package in dependencies:
+                    os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
+
+
+        self.eval_template('readme')
+
         
     def __init__(self):
 
@@ -265,9 +300,19 @@ class Builder():
         # Build travis
         print_message('Building travis file')
         self.eval_template('travis')
-        print_message('Verify travis file')
 
+        print_message('Verify travis file')
         self.verify_test_file()
+
+        # dockerignore
+        self.eval_template('dockerignore')
+
+        # GIT ignore
+        if os.environ['BUILD_BRANCH'] == 'master':
+            self.eval_template('master_gitignore')
+
+        # README
+        self.create_readme()
 
         print_success("Completed")
 
