@@ -21,6 +21,7 @@ dockerfile-builder:
     config: "config"
     test: "test"
     travis: "travis"
+    git_deploy_branches: "deploy-branches"
   envvars:
     paths:
       target:
@@ -33,7 +34,7 @@ dockerfile-builder:
         config: "bin/config"
         test: "test"
         travis: ".travis.yml"
-        travis: ".travis.yml"
+        git_deploy_branches: "deploy-branches"
       dockerfile:
         env: "/usr/local/envvars"
         setup: "/usr/local/bin/setup"

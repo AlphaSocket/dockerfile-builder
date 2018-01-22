@@ -125,7 +125,7 @@ class Builder():
                 concat += commands + "\n"
         return concat
             
-    def eval_template(self, template):
+    def eval_template(self, template, mode=None):
 
         template_file = GLOBALS['locations']['dockerfile-builder'] + '/' + GLOBALS['dockerfile-builder']['folders']['templates'] + '/' + GLOBALS['dockerfile-builder']['templates'][template]
         target_file = GLOBALS['locations']['pwd'] + "/" + GLOBALS['dockerfile-builder']['envvars']['paths']['target'][template]
@@ -142,6 +142,9 @@ class Builder():
         
         target_handler.close()
         template_file_handler.close()
+
+        if bool(mode):
+            os.chmod(target_file, mode);
 
         #run_command("envsubst < " + template_file, GLOBALS['locations']['pwd'] + "/" + target, '/dev/null')
 
@@ -166,7 +169,7 @@ class Builder():
         concat = ""
         for line in branches:
             if "master" != line:
-                concat += "- {line}".format(line=line)
+                concat += "- {line}\n".format(line=line)
         os.environ['PROJECT_VERSIONS'] = concat
 
         # Configurable envvars
@@ -176,8 +179,8 @@ class Builder():
         os.environ['PROJECT_PACKAGES'] = ""
         for stage in ['setup', 'config']:
             label = 'SETUP_DEPENDENCIES_{ucstage}'.format(ucstage=stage.upper())
-            dependencies = str(os.environ[label]).split(' ')
-            if bool(dependencies):
+            if label in os.environ:
+                dependencies = str(os.environ[label]).split(' ')
                 os.environ['PROJECT_PACKAGES'] += "- {stage} dependencies:\n".format(stage=stage.title())
                 for package in dependencies:
                     os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
@@ -295,8 +298,8 @@ class Builder():
 
         # Build test file
         print_message('Building test file')
-        self.eval_template('test')
-        
+        self.eval_template('test', 0o764)
+
         # Build travis
         print_message('Building travis file')
         self.eval_template('travis')
@@ -310,6 +313,7 @@ class Builder():
         # GIT ignore
         if os.environ['BUILD_BRANCH'] == 'master':
             self.eval_template('master_gitignore')
+            self.eval_template('git_deploy_branches', 0o764)
 
         # README
         self.create_readme()

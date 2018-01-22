@@ -21,12 +21,12 @@ if [ DOCKER = '' ]; then
 fi
 
 echo "#\n# Building image\n#\n"
-docker build  \
-        --no-cache \
-        -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} \
-        --build-arg BUILD_COMMIT=`git rev-parse --short HEAD` \
-        --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
-        .
+docker build \
+    --no-cache \
+    -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} \
+    --build-arg BUILD_COMMIT=`git rev-parse --short HEAD` \
+    --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+    .
 
 echo "#\n# Cleaning docker\n#\n"
 running_containers=$(docker ps -aq)
