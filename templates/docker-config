@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Run all confiugration scripts
+#
+set -e
+
+for config_script in ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_CONFIG}/*; 
+do
+    $config_script; 
+done;
+
+exit 0

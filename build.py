@@ -48,7 +48,7 @@ class Builder():
                 if value is None:
                     value = ""
                 export_var(name,value)
-                
+
                 if stage not in self.envvars:
                     self.envvars[stage] = OrderedDict()
                 self.envvars[stage][name] = value
@@ -70,6 +70,7 @@ class Builder():
                 files = list_to_dict(files)
 
             for key,value in files.items():
+                value = os.path.expandvars(value)
                 if concat:
                     concat += "\n"
                 paths = value.split(':')
@@ -203,6 +204,14 @@ class Builder():
 
         # Build dockerfile-builder envvars
         self.conf = {'dockerfile_builder':GLOBALS['dockerfile-builder']}
+        # Build dockerfile-builder imports
+        self.conf['dockerfile_builder']['import'] = OrderedDict(
+            {
+                0: "$DOCKERFILE_BUILDER_PATHS_TARGET_DOCKERCONFIG:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_DOCKERCONFIG",
+                1: "$DOCKERFILE_BUILDER_PATHS_TARGET_SETUP:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_SETUP",
+                2: "$DOCKERFILE_BUILDER_PATHS_TARGET_CONFIG:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_CONFIG"
+            }
+        )
         self.import_env('dockerfile_builder')
         self.import_files('dockerfile_builder')
 
@@ -280,7 +289,8 @@ class Builder():
             )
         export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
 
-        self.eval_template('env')
+        #self.eval_template('env')
+        self.eval_template('dockerconfig')
 
         # Build setup file
         print_message('Building setup file')
@@ -305,18 +315,18 @@ class Builder():
         cmd=""
         if 'cmd' in self.conf['build']['envvars']['dockerfile']:
             cmd='CMD ["{config_script} && {cmd}"]'.format(
-                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['config'],
+                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['dockerconfig'],
                 cmd=self.conf['build']['envvars']['dockerfile']['cmd']
             )
         else:
             cmd='CMD ["{config_script}"]'.format(
-                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['config'],
+                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['dockerconfig'],
             )
         export_var( 'DOCKERFILE_BUILDER_CMD', cmd )
 
          # WORKDIR
         workdir=""
-        if 'cmd' in self.conf['build']['envvars']['dockerfile']:
+        if 'workdir' in self.conf['build']['envvars']['dockerfile']:
             workdir='WORKDIR {workdir}'.format(workdir=self.conf['build']['envvars']['dockerfile']['workdir'])
         export_var( 'DOCKERFILE_BUILDER_WORKDIR', workdir )
 
