@@ -45,6 +45,8 @@ class Builder():
             for name,value in envvars.items():
                 name = "{stage}_{name}".format(stage=str(stage).upper(), name=name)
                 value = parse_content(value)
+                if value is None:
+                    value = ""
                 export_var(name,value)
                 
                 if stage not in self.envvars:
@@ -180,10 +182,13 @@ class Builder():
         for stage in ['setup', 'config']:
             label = 'SETUP_DEPENDENCIES_{ucstage}'.format(ucstage=stage.upper())
             if label in os.environ:
-                dependencies = str(os.environ[label]).split(' ')
-                os.environ['PROJECT_PACKAGES'] += "- {stage} dependencies:\n".format(stage=stage.title())
-                for package in dependencies:
-                    os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
+                dependencies = str(os.environ[label]).strip().split()
+                if dependencies:
+                    os.environ['PROJECT_PACKAGES'] += "- {stage} dependencies:\n".format(stage=stage.title())
+                    for package in dependencies:
+                        if not bool(package):
+                            package = 'None'
+                        os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
 
 
         self.eval_template('readme')
@@ -254,15 +259,26 @@ class Builder():
         print_message('Building enviroment file')
 
         docker_env  = "ENV"
+        docker_env += " \\\n\tBUILD_COMMIT=$BUILD_COMMIT"
+        docker_env += " \\\n\tBUILD_DATE=$BUILD_DATE"
         for envvar in self.docker_envvars:
             docker_env += " \\\n\t" + envvar 
         export_var('DOCKERFILE_BUILDER_ENVVARS', docker_env)
 
-        # ENTRYPOINT
-        additional = ""
-        if 'additional' in self.conf['build']['envvars']['dockerfile']['ports']:
-            additional = parse_content(self.conf['build']['envvars']['dockerfile']['ports']['additional'])
-        export_var('BUILD_DOCKERFILE_PORTS_ADDITIONAL', additional)
+        # Expose ports
+        docker_ports=""
+        if 'ports' in self.conf['build']['envvars']['dockerfile']:
+
+            additional = ""
+            if 'additional' in self.conf['build']['envvars']['dockerfile']['ports']:
+                additional = parse_content(self.conf['build']['envvars']['dockerfile']['ports']['additional'])
+            export_var('BUILD_DOCKERFILE_PORTS_ADDITIONAL', additional)
+
+            docker_ports = "EXPOSE {main} {additional}".format(
+                main=os.environ['BUILD_DOCKERFILE_PORTS_MAIN'],
+                additional=os.environ['BUILD_DOCKERFILE_PORTS_MAIN']
+            )
+        export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
 
         self.eval_template('env')
 
@@ -292,7 +308,17 @@ class Builder():
                 config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['config'],
                 cmd=self.conf['build']['envvars']['dockerfile']['cmd']
             )
+        else:
+            cmd='CMD ["{config_script}"]'.format(
+                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['config'],
+            )
         export_var( 'DOCKERFILE_BUILDER_CMD', cmd )
+
+         # WORKDIR
+        workdir=""
+        if 'cmd' in self.conf['build']['envvars']['dockerfile']:
+            workdir='WORKDIR {workdir}'.format(workdir=self.conf['build']['envvars']['dockerfile']['workdir'])
+        export_var( 'DOCKERFILE_BUILDER_WORKDIR', workdir )
 
         self.eval_template('dockerfile')#GLOBALS['dockerfile-builder']['templates']['dockerfile'], GLOBALS['dockerfile-builder']['target']['path']['dockerfile'])
 
