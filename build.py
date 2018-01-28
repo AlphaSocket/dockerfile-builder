@@ -52,7 +52,7 @@ class Builder():
                 if stage not in self.envvars:
                     self.envvars[stage] = OrderedDict()
                 self.envvars[stage][name] = value
-                concat = concat + "{name}='{value}'\n".format(name=name,value=value)
+                concat = concat + '{name}="{value}"\n'.format(name=name,value=value)
 
                 if stage in ['general', 'build', 'setup', 'config']:
                     self.docker_envvars.append('{name}="{value}"'.format(name=name,value=value))
@@ -83,13 +83,17 @@ class Builder():
             export_var('DOCKERFILE_BUILDER_IMPORTS', concat)
 
     def build_processes(self, stage, commands_prefix="", row_prefix=""):
-        # Gather processes
-        processes = self.conf[stage]['processes']
-        # Concat processes
-        imploded_processes = self.implode_processes(processes,commands_prefix,row_prefix)
-        # Expand env vars in test files ( Outside container env )
-        if stage in [ 'test', 'travis']:
-            imploded_processes = os.path.expandvars(imploded_processes)
+        imploded_processes=""
+        if 'processes' in self.conf[stage]:
+            # Gather processes
+            processes = self.conf[stage]['processes']
+
+            # Concat processes
+            imploded_processes = self.implode_processes(processes,commands_prefix,row_prefix)
+
+            # Expand env vars in test files ( Outside container env )
+            if stage in [ 'test', 'travis']:
+                imploded_processes = os.path.expandvars(imploded_processes)
         # Export var to env
         export_var('{stage}_PROCESSES'.format(stage=stage.upper()), imploded_processes)
 
@@ -268,8 +272,6 @@ class Builder():
         print_message('Building enviroment file')
 
         docker_env  = "ENV"
-        docker_env += " \\\n\tBUILD_COMMIT=$BUILD_COMMIT"
-        docker_env += " \\\n\tBUILD_DATE=$BUILD_DATE"
         for envvar in self.docker_envvars:
             docker_env += " \\\n\t" + envvar 
         export_var('DOCKERFILE_BUILDER_ENVVARS', docker_env)
