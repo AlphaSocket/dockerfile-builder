@@ -10,28 +10,39 @@ GIT_BRANCH_MASTER='master'
 GIT_BRANCH_DEVELOP='develop'
 BASEDIR=${PWD##*/}
 REPO_NAME=${BASEDIR}
-GIT_USER='alphasocket'
 CUR_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 GIT_BRANCHES=$(git for-each-ref --format='%(refname:short)' refs/heads/ | xargs)
-pass=""
-
-if [ -z "$GITHUB_PASS" ] ; then
-    echo -ne "Set GITHUB_PASS to push branches automatically:\n export GITHUB_PASS={password}\n"
-else
-    pass=":$GITHUB_PASS"
+GITHUB_USER=$(cmdipass get-one "https://github.com/login" --uuid=735fa2f77d826743b4e2d7c7fc083624 --username-only 2> /dev/null)
+GITHUB_PASS=$(cmdipass get-one "https://github.com/login" --uuid=735fa2f77d826743b4e2d7c7fc083624 --password-only 2> /dev/null)
+GITHUB_AUTH="$GITHUB_USER"
+if [ ! -z "$GITHUB_PASS" ] ; then
+    GITHUB_AUTH="$GITHUB_USER:$GITHUB_PASS"
 fi
 
 #
 # Commit master
 #
 if [ $CUR_BRANCH == $GIT_BRANCH_MASTER ] || [ $CUR_BRANCH == $GIT_BRANCH_DEVELOP ]; then
+    # Rebuild dockerfile and scripts
+    $(which dockerfile-build)
     git add . 
     if [ -z "$(git status --porcelain)" ]; then 
-        echo -ne "Nothing to commit \n"
-    else 
-        git commit --author "$GIT_AUTHOR"
+        echo -ne "[$CUR_BRANCH] Nothing to commit \n"
+    else
+        if [ ! -z "$(git status deploy-branches --porcelain 2>/dev/null)" ]
+        then
+            DEPLOY_BRANCHES_CHANGED="True"
+        else
+            DEPLOY_BRANCHES_CHANGED="False"
+        fi
+        
+        git commit -m "Rebuilt dockerfile and script" --author "$GIT_AUTHOR"
+        # If the deploy-script is modified run the new script and exit
+        if [ "$DEPLOY_BRANCHES_CHANGED" = "True" ]; then
+            ./deploy-branches
+            exit 0
+        fi
     fi
-    
 else
     echo -ne "$0 can be launched only from master and develop\n"
     exit 1
@@ -51,21 +62,18 @@ do
     git pull origin $branch
     git merge master --no-commit 
     # Remove master files
-    rm -f .gitignore
-    rm -f deploy-branches
-    git add .
-    git commit -m "Merged master in $branch" --allow-empty --author "$GIT_AUTHOR"
     $(which dockerfile-build)
     rm -f .gitignore
     rm -f deploy-branches
     git add .
-    git commit -m "Re-built dockerfile" --allow-empty --author "$GIT_AUTHOR"
+    git commit -m "Merged master in $branch and re-built dockerfile" --allow-empty --author "$GIT_AUTHOR"
     echo -ne "-- Updated branch $branch -- \n\n"
 done
+
+git checkout $GIT_BRANCH_MASTER --force
 
 #
 # Push
 #
-git checkout $GIT_BRANCH_MASTER --force
-git push https://$GIT_USER$pass@github.com/$GIT_USER/$REPO_NAME --all
-git push https://$GIT_USER$pass@github.com/$GIT_USER/$REPO_NAME --tags
+git push https://$GITHUB_AUTH@github.com/$GITHUB_USER/$REPO_NAME --all
+git push https://$GITHUB_AUTH@github.com/$GITHUB_USER/$REPO_NAME --tags

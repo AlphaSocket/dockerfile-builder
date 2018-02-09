@@ -16,6 +16,7 @@ class Builder():
 
     conf = OrderedDict()
     envvars = OrderedDict()
+    docker_imports = []
     docker_envvars = []
 
     def resolve_env_var(self, envvars):
@@ -63,24 +64,62 @@ class Builder():
     def import_files(self, stage):
         if 'import' in self.conf[stage]:
             files = self.conf[stage]['import']
-
-            concat = get_command_output('echo "$DOCKERFILE_BUILDER_IMPORTS"')
             
             if type(files) is list:
                 files = list_to_dict(files)
 
+            ## Breaking format source:target
             for key,value in files.items():
                 value = os.path.expandvars(value)
-                if concat:
-                    concat += "\n"
                 paths = value.split(':')
                 source_path = paths[0]
+                #source_path = 'imports/' + paths[0]
                 build_path = paths[1]
-
+                
+                ## Add file by file to not override previous injected files
                 if source_path and build_path:
-                    concat = concat + "ADD {source_path} {build_path}".format(source_path=source_path,build_path=build_path)
+                    # Source is file
+                    if os.path.isfile(source_path):
+                        self.docker_imports.append({"source":source_path, "target":build_path})
+                    # Source is dir
+                    else:
+                        tree = self.build_folder_imports(source_path, build_path);
+                        for file_source_path, file_build_path in tree:
+                            self.docker_imports.append({"source":file_source_path, "target":file_build_path})
 
+            # Exporting env variable
+            concat = ""
+            for imported in self.docker_imports:
+                concat = concat + "ADD {source} {target}\n".format(
+                    source=imported['source'],
+                    target=imported['target']
+                )
             export_var('DOCKERFILE_BUILDER_IMPORTS', concat)
+
+    def build_folder_imports(self, source_path, build_path):
+        tree=[]
+        source_path_lenght = len(source_path)
+        for dirpath, dirnames, filenames in os.walk(source_path):
+            
+            for filename in filenames:
+                # Replacing source patch with build path in dirpath
+                build_dirpath = build_path + dirpath[source_path_lenght:] 
+                
+                file_source_path = dirpath + '/' + filename
+                file_build_path = build_dirpath + '/' + filename
+                tree.append([file_source_path,file_build_path])
+                
+            # Directory > recursive - NOT NECESSARY os.walk() already does the recursion to subfolders
+            #for dirname in dirnames:
+             #   print('Reading dir ' + dirname)
+                # content = self.build_folder_imports(
+                #     source_path + '/' + dirname,
+                #     build_path+ '/' + dirname
+                # )
+                # tree = tree + content
+                
+            #print( source_path, build_path,  dirnames, filenames, tree)
+        return tree
 
     def build_processes(self, stage, commands_prefix="", row_prefix=""):
         imploded_processes=""
@@ -104,7 +143,7 @@ class Builder():
         for process in processes:
             concat += "# {title}\n".format(title=process['title'])
 
-            commands = ""
+            commands = else_commands = ""
 
             for command in process['commands']:
                 if 'shell_condition' in process:
@@ -115,17 +154,25 @@ class Builder():
                     command_suffix = '\n'
 
                 commands += "{command}{command_suffix}".format(
-                                commands_prefix=commands_prefix,
+                                command=command,
+                                command_suffix=command_suffix
+                            )
+                
+            if 'else' in process:
+                else_commands = "else "
+                for else_command in process['else']:
+                    else_commands = "{else_command}{command_suffix}".format(
                                 command=command,
                                 command_suffix=command_suffix
                             )
 
             if 'shell_condition' in process:
-                string = "{commands_prefix}if [ {condition} ]; then\n{commands}{row_prefix}fi\n"
+                string = "{commands_prefix}if [ {condition} ]; then\n{commands}{else_commands}{row_prefix}fi\n"
                 concat += string.format(
                             commands_prefix=commands_prefix,
                             condition=process['shell_condition'],
                             commands=commands,
+                            else_commands=else_commands,
                             row_prefix=row_prefix
                         )
             else:
@@ -287,7 +334,7 @@ class Builder():
 
             docker_ports = "EXPOSE {main} {additional}".format(
                 main=os.environ['BUILD_DOCKERFILE_PORTS_MAIN'],
-                additional=os.environ['BUILD_DOCKERFILE_PORTS_MAIN']
+                additional=os.environ['BUILD_DOCKERFILE_PORTS_ADDITIONAL']
             )
         export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
 
@@ -313,7 +360,7 @@ class Builder():
         #    entrypoint = 'ENTRYPOINT ["{entrypoint}"]'.format(entrypoint=self.conf['build']['envvars']['dockerfile']['entrypoint'])
         #export_var('DOCKERFILE_BUILDER_ENTRYPOINT', entrypoint)
 
-        # CMD
+        # CMD -> Move to docker-run bin
         cmd=""
         if 'cmd' in self.conf['build']['envvars']['dockerfile']:
             cmd='CMD ["{config_script} && {cmd}"]'.format(

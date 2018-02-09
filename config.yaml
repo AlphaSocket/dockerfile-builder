@@ -1,0 +1,101 @@
+#
+# Configuration
+# 
+locations:
+  dockerfile-builder: 
+    valueFromCommand: "dirname $(realpath $(which dockerfile-build))"
+
+dockerfile-builder:
+  config:
+    file:
+      name: "dockerfile-builder.yaml"
+  folders:
+    templates: "templates"
+  templates:
+    # Docker
+    dockerfile: "Dockerfile"
+    dockersetup: "docker-setup"
+    dockerconfig: "docker-config"
+    env: "env"
+    setup: "setup"
+    config: "config"
+    test: "test"
+    # Testing
+    travis: "travis"
+    # Repo
+    dockerignore: ".dockerignore"
+    readme: "README.md"
+    master_gitignore: "master.gitignore"
+    git_deploy_branches: "deploy-branches"
+  envvars:
+    paths:
+      #target:
+      #  dockerfile: "Dockerfile"
+      #  dockerconfig: "imports/bin/docker-config"
+      #  setup: "imports/bin/setup"
+      #  config: "imports/bin/config"
+      #  dockerignore: ".dockerignore"
+      #  master_gitignore: ".gitignore"
+      #  readme: "README.md"
+      #  test: "test"
+      #  travis: ".travis.yml"
+      #  git_deploy_branches: "deploy-branches"
+      target:
+        dockerfile: "Dockerfile"
+        dockerconfig: "imports/bin/docker-config"
+        dockerignore: ".dockerignore"
+        master_gitignore: ".gitignore"
+        readme: "README.md"
+        setup: "imports/bin/setup"
+        config: "imports/bin/config"
+        travis: ".travis.yml"
+        test: "bin/test"
+        git_deploy_branches: "bin/deploy-branches"
+      dockerfile:
+        folders:
+          bin: /usr/local/bin
+          setup: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/setup
+          #setup: /usr/local/bin/setup
+          config: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/config
+          #config: /usr/local/bin/config
+        dockerconfig: "/usr/local/bin/docker-config"
+        setup: $DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_SETUP/$(date +%s)
+          #valueFromCommand: 'echo "/usr/local/bin/setup/$(date +%s)"'
+        config: $DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_CONFIG/$(date +%s)
+          #valueFromCommand: 'echo "/usr/local/bin/config/$(date +%s)"'
+
+# - Defaults values for builds -------------------------
+
+defaults:
+  general:
+    envvars:
+      docker:
+        register: docker.io
+        user: '03192859189254'
+      keys:
+        true: "True"
+        false: "False"
+        dev: "dev"
+        prd: "prd"
+  build:
+    envvars:
+      branch:
+        valueFromCommand: 'git rev-parse --abbrev-ref HEAD'
+      commit:
+        valueFromCommand: 'git rev-parse --short HEAD'
+      version:
+        valueFromCommand: 'echo $BUILD_BRANCH | cut -d \- -f 1'
+      env:
+        valueFromCommand: 'env=$(echo $BUILD_BRANCH | cut -d \- -f 2); [ "$env" = "$BUILD_VERSION" ] && echo $GENERAL_KEYS_PRD || echo $env'
+    dockerfile:
+      image: alpine:latest
+      name: $BUILD_NAME
+      version: $BUILD_BRANCH
+  setup:
+    envvars:
+      dependencies:
+        setup: ""
+        config: ""
+  config:
+    envvars: {}
+      
