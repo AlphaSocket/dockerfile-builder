@@ -1,101 +1,261 @@
 #
-# Configuration
-# 
-locations:
-  dockerfile-builder: 
-    valueFromCommand: "dirname $(realpath $(which dockerfile-build))"
+# dockerfile-builder config
+#
+file:
+  name: dockerfile-builder.yaml
 
-dockerfile-builder:
-  config:
-    file:
-      name: "dockerfile-builder.yaml"
-  folders:
-    templates: "templates"
-  templates:
-    # Docker
-    dockerfile: "Dockerfile"
-    dockersetup: "docker-setup"
-    dockerconfig: "docker-config"
-    env: "env"
-    setup: "setup"
-    config: "config"
-    test: "test"
-    # Testing
-    travis: "travis"
-    # Repo
-    dockerignore: ".dockerignore"
-    readme: "README.md"
-    master_gitignore: "master.gitignore"
-    git_deploy_branches: "deploy-branches"
-  envvars:
-    paths:
-      #target:
-      #  dockerfile: "Dockerfile"
-      #  dockerconfig: "imports/bin/docker-config"
-      #  setup: "imports/bin/setup"
-      #  config: "imports/bin/config"
-      #  dockerignore: ".dockerignore"
-      #  master_gitignore: ".gitignore"
-      #  readme: "README.md"
-      #  test: "test"
-      #  travis: ".travis.yml"
-      #  git_deploy_branches: "deploy-branches"
-      target:
-        dockerfile: "Dockerfile"
-        dockerconfig: "imports/bin/docker-config"
-        dockerignore: ".dockerignore"
-        master_gitignore: ".gitignore"
-        readme: "README.md"
-        setup: "imports/bin/setup"
-        config: "imports/bin/config"
-        travis: ".travis.yml"
-        test: "bin/test"
-        git_deploy_branches: "bin/deploy-branches"
-      dockerfile:
-        folders:
-          bin: /usr/local/bin
-          setup: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/setup
-          #setup: /usr/local/bin/setup
-          config: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/config
-          #config: /usr/local/bin/config
-        dockerconfig: "/usr/local/bin/docker-config"
-        setup: $DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_SETUP/$(date +%s)
-          #valueFromCommand: 'echo "/usr/local/bin/setup/$(date +%s)"'
-        config: $DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_CONFIG/$(date +%s)
-          #valueFromCommand: 'echo "/usr/local/bin/config/$(date +%s)"'
-
-# - Defaults values for builds -------------------------
-
+# Defaults values used as base for dockerfile-builds
 defaults:
+  #
+  # General data used as label or test values
+  #
   general:
     envvars:
       docker:
-        register: docker.io
-        user: '03192859189254'
+        users:
+          dev:
+            valueFromCommand: echo "${DOCKER_DEV_USER}"
+          prd:
+            valueFromCommand: echo "${DOCKER_USER}"
+        user:
+          valueFromParse: $GENERAL_DOCKER_USERS_PRD
+        registries:
+          dev:
+            valueFromCommand: echo "${DOCKER_DEV_REGISTRY}"
+          prd:
+            valueFromCommand: echo "${DOCKER_REGISTRY}"
+        registry:
+          valueFromParse: $GENERAL_DOCKER_REGISTRIES_PRD
       keys:
         true: "True"
         false: "False"
         dev: "dev"
         prd: "prd"
-  build:
+  #
+  # Project data:
+  #
+  project:
+    title: "Project title"
+    codename: "project-codename"
+    description: "Project description"
+
+  #
+  # Builder stage:
+  #
+  # Configuration for the builder
+  #
+  #dockerfile-builder:
+  builder:
     envvars:
+      # Target paths of build files
+      targets:
+        folders:
+          build: # Builder pool -> Where dockerfile is
+            binaries: "bin"
+            imports: "imports"
+            volumes: "volumes"
+            dockerfile:
+              binaries:
+                valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_IMPORTS/bin"
+          container: # Setup pool -> Inside container
+            binaries: /usr/local/bin
+            setup:
+              valueFromParse: "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/setup"
+            config:
+              valueFromParse: "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/config"
+        build:
+          # First level
+          dockerfile: "Dockerfile"
+          readme: "README.md"
+          dockerignore: ".dockerignore"
+          master_gitignore: ".gitignore"
+          travis: ".travis.yml"
+          # Extra binaries used to manage repo and create image
+          bin_git_deploy_branches:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/deploy-branches"
+          bin_build:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/build"
+          bin_test:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/test"
+          bin_push:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/push"
+          # Binaries used in docker-build and containers
+          imports_setup:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/setup"
+          imports_config:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/config"
+          imports_docker_config:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-config"
+          imports_docker_run:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-run"
+        container:
+          setup:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_SETUP/$(date +%s)"'
+          config:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG/$(date +%s)"'
+          docker_config:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-config"'
+          docker_run:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-run"'
+          
+
+    # File read to build
+    file:
+      name: "dockerfile-builder.yaml"
+    folders:
+      templates: "templates"
+    # Template key > template file
+    templates:
+      # First level template
+      dockerfile: "Dockerfile"
+      readme: "README.md"
+      dockerignore: ".dockerignore"
+      master_gitignore: "master.gitignore"
+      travis: "travis"
+      # Templates for binaries used to manage docker image ad repo
+      bin_git_deploy_branches: "deploy-branches"
+      bin_build: "build"
+      bin_test: "test"
+      bin_push: "push"
+      # Templates for binaries used in container
+      imports_setup: "setup"
+      imports_config: "config"
+      imports_docker_config: "docker-config"
+      imports_docker_run: "docker-run"
+    branch2templates:
+      master:
+        - key: readme
+        - key: master_gitignore
+        - key: bin_git_deploy_branches
+          mode: 754
+      default:
+        - key: readme
+        # Build imported file
+        - key: imports_docker_config
+          mode: 754
+        - key: imports_docker_run
+          mode: 754
+        - key: imports_setup
+          mode: 754
+        - key: imports_config
+          mode: 754
+        # Build docker file
+        - key: dockerfile
+        - key: dockerignore
+        - key: travis
+        # Build extra files to build test and push
+        - key: bin_build
+          mode: 754
+        - key: bin_test
+          mode: 754
+        - key: bin_push
+          mode: 754
+    imports:
+      - "bin/docker-config:$BUILDER_TARGETS_CONTAINER_DOCKER_CONFIG"
+      - "bin/docker-run:$BUILDER_TARGETS_CONTAINER_DOCKER_RUN"
+      - "bin/setup:$BUILDER_TARGETS_CONTAINER_SETUP"
+      - "bin/config:$BUILDER_TARGETS_CONTAINER_CONFIG"
+  #
+  # Build stage:
+  # Creating files from templates
+  #
+  build:
+    args:
+      commit: '$(git rev-parse HEAD)'
+      date: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")'
+    envvars:
+      user:
+        valueFromParse: $GENERAL_DOCKER_USERS_DEV
+      registry:
+        valueFromParse: $GENERAL_DOCKER_REGISTRIES_DEV
+      name: "project-build-name"
+      repo:
+        valueFromParse: "https://github.com/alphaSocket/dockerized-${BUILD_NAME}"
       branch:
         valueFromCommand: 'git rev-parse --abbrev-ref HEAD'
-      commit:
-        valueFromCommand: 'git rev-parse --short HEAD'
+      #commit:
+      #  valueFromCommand: 'git rev-parse --short HEAD'
       version:
-        valueFromCommand: 'echo $BUILD_BRANCH | cut -d \- -f 1'
+        valueFromCommand: '[ "$BUILD_BRANCH" = "master" ] && echo "latest" || echo "$BUILD_BRANCH"'
       env:
         valueFromCommand: 'env=$(echo $BUILD_BRANCH | cut -d \- -f 2); [ "$env" = "$BUILD_VERSION" ] && echo $GENERAL_KEYS_PRD || echo $env'
-    dockerfile:
-      image: alpine:latest
-      name: $BUILD_NAME
-      version: $BUILD_BRANCH
+      from: alpine:latest
+      ports:
+        main: 80
+        additional: ""
+    imports: []
+        
+  #
+  # Setup stage:
+  # Script run during build of the docker image
+  #
   setup:
     envvars:
       dependencies:
         setup: ""
         config: ""
+    # Setup Processes
+    processes:
+      - title: "Install dependencies"
+        shell_condition: '! -z "$SETUP_DEPENDENCIES_CONFIG$SETUP_DEPENDENCIES_SETUP"'
+        commands:
+          - "apk add --no-cache $SETUP_DEPENDENCIES_CONFIG $SETUP_DEPENDENCIES_SETUP"
+      
+      
+  #
+  # Config stage:
+  # Scripts run to configure the container before run
+  #
   config:
     envvars: {}
-      
+      #user: 'docker'
+      #group: 'docker'
+    processes: []
+      #- title: "Setup user and group"
+      #  commands:
+      #    - addgroup -S "$CONFIG_GROUP"
+      #    - adduser -S "$CONFIG_USER" "$CONFIG_GROUP"
+
+  #
+  # Test stage:
+  # Scripts run to test the container once started
+  #
+  test:
+    envvars:
+      container:
+        name:
+          valueFromParse: $BUILD_NAME
+      host:
+        port: 30000
+      image:
+        user:
+          valueFromParse: $BUILD_USER
+        name:
+          valueFromParse: $BUILD_NAME
+        version:
+          valueFromParse: $BUILD_VERSION
+    processes: []
+
+  #
+  # Push stage:
+  # Variables used to push the docker images
+  #
+  push:
+    envvars:
+      docker:
+        dev:
+          registry:
+            valueFromParse: $BUILD_REGISTRY
+          user:
+            valueFromParse: $BUILD_USER
+        registry:
+          valueFromParse: $GENERAL_DOCKER_REGISTRY
+        user:
+          valueFromParse: $GENERAL_DOCKER_USER
+      image:
+        name:
+          valueFromParse: $BUILD_NAME
+        version: 
+          valueFromParse: $BUILD_VERSION
+
+

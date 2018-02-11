@@ -1,59 +1,6 @@
 #
-# GLOBALS
+# Configuration
 # 
-# ENV var won't work as this is not an ordered dict
-#
 locations:
   dockerfile-builder: 
     valueFromCommand: "dirname $(realpath $(which dockerfile-build))"
-
-dockerfile-builder:
-  folders:
-    templates: "templates"
-  config:
-    file:
-      name: "dockerfile-builder.yaml"
-  templates:
-    # Docker
-    dockerfile: "Dockerfile"
-    #dockersetup: "docker-setup"
-    dockerconfig: "docker-config"
-    env: "env"
-    setup: "setup"
-    config: "config"
-    test: "test"
-    # Testing
-    travis: "travis"
-    # Repo
-    dockerignore: ".dockerignore"
-    readme: "README.md"
-    master_gitignore: "master.gitignore"
-    git_deploy_branches: "deploy-branches"
-
-  envvars:
-    paths:
-      target:
-        dockerfile: "Dockerfile"
-        dockerconfig: "bin/docker-config"
-        dockerignore: ".dockerignore"
-        master_gitignore: ".gitignore"
-        readme: "README.md"
-        setup: "bin/setup"
-        config: "bin/config"
-        test: "test"
-        travis: ".travis.yml"
-        git_deploy_branches: "deploy-branches"
-      dockerfile:
-        folders:
-          bin: /usr/local/bin
-          #setup: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/setup
-          setup: /usr/local/bin/setup
-          #config: ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_BIN}/config
-          config: /usr/local/bin/config
-        dockerconfig: "/usr/local/bin/docker-config"
-        setup: 
-          valueFromCommand: 'echo "/usr/local/bin/setup/$(date +%s)"'
-          #valueFromCommand: 'echo "$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_SETUP/$(date +%s)"'
-        config: 
-          valueFromCommand: 'echo "/usr/local/bin/config/$(date +%s)"'
-          #valueFromCommand: 'echo "$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_CONFIG/$(date +%s)"'

@@ -11,22 +11,17 @@ addons:
             - curl
             - libfcgi0ldbl
 
+${TEST_NOTIFICATION_WEBHOOK}
+
 services:
   - docker
 
 before_install:
   - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD" $DOCKER_REGISTER;
-  - docker build 
-        --no-cache 
-        -t ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION}
-        --build-arg BUILD_COMMIT=`git rev-parse --short HEAD` 
-        --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` .
 
 script:
-${TRAVIS_PROCESSES}
+    - bin/build
+    - bin/test
 
 after_success:
-  - if [ "$DOCKER_USERNAME" ]; then
-        docker tag ${TEST_DOCKERFILE_TAG_USER}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION} ${DOCKER_REGISTER}/${DOCKER_USERNAME}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION};
-        docker push ${DOCKER_REGISTER}/${DOCKER_USERNAME}/${TEST_DOCKERFILE_TAG_NAME}:${TEST_DOCKERFILE_TAG_VERSION};
-    fi
+  - bin/push

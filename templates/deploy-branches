@@ -29,17 +29,17 @@ if [ $CUR_BRANCH == $GIT_BRANCH_MASTER ] || [ $CUR_BRANCH == $GIT_BRANCH_DEVELOP
     if [ -z "$(git status --porcelain)" ]; then 
         echo -ne "[$CUR_BRANCH] Nothing to commit \n"
     else
-        if [ ! -z "$(git status deploy-branches --porcelain 2>/dev/null)" ]
+        if [ ! -z "$(git status bin/deploy-branches --porcelain 2>/dev/null)" ]
         then
             DEPLOY_BRANCHES_CHANGED="True"
         else
             DEPLOY_BRANCHES_CHANGED="False"
         fi
         
-        git commit -m "Rebuilt dockerfile and script" --author "$GIT_AUTHOR"
+        git commit --author "$GIT_AUTHOR"
         # If the deploy-script is modified run the new script and exit
         if [ "$DEPLOY_BRANCHES_CHANGED" = "True" ]; then
-            ./deploy-branches
+            bin/deploy-branches
             exit 0
         fi
     fi
@@ -47,6 +47,8 @@ else
     echo -ne "$0 can be launched only from master and develop\n"
     exit 1
 fi
+
+MASTER_COMMIT_MESSAGE=$(cat .git/COMMIT_EDITMSG | grep -v '^#' | xargs)
 
 #
 # Deploy in other branches
@@ -60,13 +62,20 @@ do
     echo -ne "-- Updating branch $branch -- \n"
     git checkout --force $branch
     git pull origin $branch
-    git merge master --no-commit 
-    # Remove master files
-    $(which dockerfile-build)
+    # Ignoring failed merge 
+    git merge master --no-commit 2>/dev/null || true
+    # Fix retrocompatibility Remove all old files
+    # find . -maxdepth 1  ! -name 'dockerfile-builder.yaml' -type f -exec rm -f {} +
     rm -f .gitignore
+    rm -f envvars
+    rm -f test
     rm -f deploy-branches
+    rm -f bin/*
+    find . -maxdepth 1 -type d ! -name 'bin' ! -name 'imports' ! -name 'volumes' ! -name '.git' ! -name '.' -exec mv -t ./imports/ {} +
+    ### 
+    $(which dockerfile-build)
     git add .
-    git commit -m "Merged master in $branch and re-built dockerfile" --allow-empty --author "$GIT_AUTHOR"
+    git commit -m "$MASTER_COMMIT_MESSAGE. Rebuilt dockerfile extras and resources" --allow-empty --author "$GIT_AUTHOR"
     echo -ne "-- Updated branch $branch -- \n\n"
 done
 

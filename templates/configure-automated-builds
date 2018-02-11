@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+const { exec } = require('child_process');
+let dockerHubAPI = require('docker-hub-api');
+//let semaphoreCiAPI = require('semaphore-ci-api');//   <- exists ??
+
+let dockerDevUser=procevv.
+let dockerDevPass=procevv.
+dockerDevUser = exec('cmdipass get-one "https://hub.docker.com" --uuid=fc1eca55c73f304da3d0d04a55976a3a --username-only')
+
+quit()
+
+
+dockerHubAPI.login(dockerDevUser, dockerDevPass);
+
+
+/**
+ * This should run from master every time a branch is created in repo
+ *
+ */
+
+/*
+ * Dockerhub dev
+ * 
+ * Configure automated build from Dockerhub dev
+ * - Remove or reconfigure?
+ * - remove by repo_name?
+ *
+ * Create/reconfigure automated build from Dockerhub dev
+ * - create build from repo
+ * - Create build for each branch
+ * - Set repository link using BUILD_FROM ( ex: when alpine:latest is rebuilt this is rebuilt too )
+ * - Set webhook to semaphoreCI build to rebuilt the prd build
+ * 
+*/
+
+createAutomatedBuild(username, name, details)
+
+
+/**
+ * Semaphore:
+ *
+ * Configure automated build from semaphore
+ * - Remove or reconfigure?
+ * - Remove by repo_name?
+ *
+ *
+ * Create automated build from semaphore
+ * - Create build for each branch
+ * - set env vars to push to prd registry ?
+ * - Set slack notification webhook
+ * - Set pub.key
+ */
+

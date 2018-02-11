@@ -18,7 +18,7 @@ class Builder():
     envvars = OrderedDict()
     docker_imports = []
     docker_envvars = []
-
+    
     def resolve_env_var(self, envvars):
         result = OrderedDict()
         for key,value in envvars.items():
@@ -36,8 +36,7 @@ class Builder():
                     result[prefix + variable_name] = value
         return result
 
-    # Create envfile in Dockerfile
-    def import_env(self, stage):
+    def import_stage_env(self, stage, parse=True):
         if 'envvars' in self.conf[stage]:
             envvars = self.conf[stage]['envvars']
             envvars = self.resolve_env_var(envvars)
@@ -45,11 +44,13 @@ class Builder():
 
             for name,value in envvars.items():
                 name = "{stage}_{name}".format(stage=str(stage).upper(), name=name)
-                value = parse_content(value)
                 if value is None:
                     value = ""
+                if parse is True:
+                    value = parse_content(value)
                 export_var(name,value)
 
+                # Keep a list of stage envvars in builder envvars
                 if stage not in self.envvars:
                     self.envvars[stage] = OrderedDict()
                 self.envvars[stage][name] = value
@@ -60,11 +61,10 @@ class Builder():
 
             export_var('DOCKERFILE_BUILDER_{stage}_ENVVARS'.format(stage=stage.upper()), concat)
 
-    # Create ADD in Dockerfile
-    def import_files(self, stage):
-        if 'import' in self.conf[stage]:
-            files = self.conf[stage]['import']
-            
+    def import_stage_files(self, stage):
+        if 'imports' in self.conf[stage]:
+            files = self.conf[stage]['imports']
+
             if type(files) is list:
                 files = list_to_dict(files)
 
@@ -72,8 +72,10 @@ class Builder():
             for key,value in files.items():
                 value = os.path.expandvars(value)
                 paths = value.split(':')
-                source_path = paths[0]
-                #source_path = 'imports/' + paths[0]
+                source_path = '{0}/{1}'.format(
+                    os.environ['BUILDER_TARGETS_FOLDERS_BUILD_IMPORTS'],
+                    paths[0]
+                )
                 build_path = paths[1]
                 
                 ## Add file by file to not override previous injected files
@@ -87,14 +89,22 @@ class Builder():
                         for file_source_path, file_build_path in tree:
                             self.docker_imports.append({"source":file_source_path, "target":file_build_path})
 
-            # Exporting env variable
             concat = ""
             for imported in self.docker_imports:
-                concat = concat + "ADD {source} {target}\n".format(
+                concat += "ADD {source} {target}\n".format(
                     source=imported['source'],
                     target=imported['target']
                 )
-            export_var('DOCKERFILE_BUILDER_IMPORTS', concat)
+            
+            value = ""
+            if 'DOCKERFILE_BUILDER_IMPORTS' in os.environ:
+                value = os.environ['DOCKERFILE_BUILDER_IMPORTS'] + concat;
+                del os.environ['DOCKERFILE_BUILDER_IMPORTS']
+            else:
+                value = concat;
+                
+            # Exporting env variable
+            export_var('DOCKERFILE_BUILDER_IMPORTS', concat) # don't know.. python magic
 
     def build_folder_imports(self, source_path, build_path):
         tree=[]
@@ -108,20 +118,9 @@ class Builder():
                 file_source_path = dirpath + '/' + filename
                 file_build_path = build_dirpath + '/' + filename
                 tree.append([file_source_path,file_build_path])
-                
-            # Directory > recursive - NOT NECESSARY os.walk() already does the recursion to subfolders
-            #for dirname in dirnames:
-             #   print('Reading dir ' + dirname)
-                # content = self.build_folder_imports(
-                #     source_path + '/' + dirname,
-                #     build_path+ '/' + dirname
-                # )
-                # tree = tree + content
-                
-            #print( source_path, build_path,  dirnames, filenames, tree)
         return tree
 
-    def build_processes(self, stage, commands_prefix="", row_prefix=""):
+    def build_stage_processes(self, stage, commands_prefix="", row_prefix=""):
         imploded_processes=""
         if 'processes' in self.conf[stage]:
             # Gather processes
@@ -142,6 +141,7 @@ class Builder():
 
         for process in processes:
             concat += "# {title}\n".format(title=process['title'])
+            concat += 'echo "### {title}..."\n'.format(title=process['title'])
 
             commands = else_commands = ""
 
@@ -162,7 +162,7 @@ class Builder():
                 else_commands = "else "
                 for else_command in process['else']:
                     else_commands = "{else_command}{command_suffix}".format(
-                                command=command,
+                                else_command=else_command,
                                 command_suffix=command_suffix
                             )
 
@@ -181,8 +181,16 @@ class Builder():
             
     def eval_template(self, template, mode=None):
 
-        template_file = GLOBALS['locations']['dockerfile-builder'] + '/' + GLOBALS['dockerfile-builder']['folders']['templates'] + '/' + GLOBALS['dockerfile-builder']['templates'][template]
-        target_file = GLOBALS['locations']['pwd'] + "/" + GLOBALS['dockerfile-builder']['envvars']['paths']['target'][template]
+        template_file = "{builder_path}/{template_folder}/{template_key}".format(
+            builder_path=GLOBALS['locations']['dockerfile-builder'],
+            template_folder=self.conf['builder']['folders']['templates'],
+            template_key=self.conf['builder']['templates'][template]
+        )
+        
+        target_file = "{pwd}/{template_target}".format(
+            pwd=GLOBALS['locations']['pwd'],
+            template_target=os.environ['BUILDER_TARGETS_BUILD_{0}'.format(template.upper())]
+        )
         
         prepare_file(target_file)
         
@@ -197,17 +205,56 @@ class Builder():
         target_handler.close()
         template_file_handler.close()
 
-        if bool(mode):
+        if mode is not None:
             os.chmod(target_file, mode);
 
-        #run_command("envsubst < " + template_file, GLOBALS['locations']['pwd'] + "/" + target, '/dev/null')
-
+    def rm_template_target(self, template):
+        target_file = "{pwd}/{template_target}".format(
+            pwd=GLOBALS['locations']['pwd'],
+            template_target=os.environ['BUILDER_TARGETS_BUILD_{0}'.format(template.upper())]
+        )
+        if target_file and os.path.isfile(target_file):
+            os.remove(target_file)
+        
     def verify_test_file(self):
-        if verify_yaml_file(GLOBALS['dockerfile-builder']['envvars']['paths']['target']['test']) == False:
+        if verify_yaml_file(os.environ['BUILDER_TARGETS_BUILD_TRAVIS']) == False:
             print_error('Invalid travis file')
             exit(1)
 
-    def create_readme(self):
+    def build_builder_env(self):
+        # Build args
+        docker_args = ""
+        build_args = ""
+        if 'args' in self.conf['build']:
+            for arg,value in self.conf['build']['args'].items():
+                docker_args += "ARG BUILD_{0}\n".format(arg.upper())
+                build_args += "--build-arg BUILD_{0}={1} ".format(arg.upper(),value)
+        export_var('DOCKERFILE_BUILDER_ARGS', docker_args)
+        export_var('BUILD_ARGS', build_args)
+        
+        # Build env file
+        docker_env  = "ENV"
+        for envvar in self.docker_envvars:
+            docker_env += " \\\n\t" + envvar 
+        export_var('DOCKERFILE_BUILDER_ENVVARS', docker_env)
+
+        # Expose ports
+        docker_ports=""
+        if 'ports' in self.conf['build']['envvars']:
+
+            docker_ports = "EXPOSE {main} {additional}".format(
+                main=os.environ['BUILD_PORTS_MAIN'],
+                additional=os.environ['BUILD_PORTS_ADDITIONAL']
+            )
+        export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
+
+         # WORKDIR
+        workdir=""
+        if 'workdir' in self.conf['build']['envvars']:
+            workdir='WORKDIR {workdir}'.format(workdir=os.environ['BUILD_WORKDIR'])
+        export_var( 'DOCKERFILE_BUILDER_WORKDIR', workdir )
+        
+    def build_project_env(self):
         os.environ['PROJECT_TITLE'] = self.conf['project']['title']
         os.environ['PROJECT_CODENAME'] = self.conf['project']['codename']
         os.environ['PROJECT_DESCRIPTION'] = self.conf['project']['description']
@@ -216,7 +263,7 @@ class Builder():
         if os.environ['BUILD_BRANCH'] == 'master':
             os.environ['PROJECT_VERSION'] = "latest"
         else:
-            os.environ['PROJECT_VERSION'] = os.environ['TEST_DOCKERFILE_TAG_VERSION']
+            os.environ['PROJECT_VERSION'] = os.environ['BUILD_VERSION']
 
         # Format versions
         branches = get_command_output("git for-each-ref --format='%(refname:short)' refs/heads/").split("\n")
@@ -241,10 +288,48 @@ class Builder():
                         if not bool(package):
                             package = 'None'
                         os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
+    
+    def build_travis_env(self):
+        if 'TEST_NOTIFICATION_WEBHOOK' in os.environ and bool(os.environ['TEST_NOTIFICATION_WEBHOOK']):
+            notification_value="notifications:\n    webhooks: " + os.environ['TEST_NOTIFICATION_WEBHOOK']
+        else:
+            notification_value=""
+        export_var('TEST_NOTIFICATION_WEBHOOK', notification_value)
 
+    def import_envvars(self):
+        stages = []
+        # Set correct order of import
+        stages.append('project')
+        stages.append('builder')
+        stages.append('general')
+        stages.append('build')
+        stages.append('setup')
+        stages.append('config')
+        stages.append('test')
+        stages.append('push')
 
-        self.eval_template('readme')
-
+        # Import var without parsing
+        for stage in stages:
+            self.import_stage_env(stage, False)
+        # Reset docker_envvars
+        self.docker_envvars = []
+        # Import var parsing data correctly (having already the value for early run)
+        for stage in stages:
+            self.import_stage_env(stage)
+        
+    def import_files(self):
+        self.import_stage_files('builder')
+        self.import_stage_files('build')
+        
+    def build_processes(self):
+        # Build setup processes
+        self.build_stage_processes('setup')
+        # Build config processes
+        self.build_stage_processes('config')
+        # Build test processes
+        self.build_stage_processes('test')
+         # Build travis processes
+        self.build_stage_processes('travis', ' - ', "    ")
         
     def __init__(self):
 
@@ -253,159 +338,72 @@ class Builder():
         import_globals(dir_path + "/globals.yaml")
         from Globals import GLOBALS
 
-        # Build dockerfile-builder envvars
-        self.conf = {'dockerfile_builder':GLOBALS['dockerfile-builder']}
-        # Build dockerfile-builder imports
-        self.conf['dockerfile_builder']['import'] = OrderedDict(
-            {
-                0: "$DOCKERFILE_BUILDER_PATHS_TARGET_DOCKERCONFIG:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_DOCKERCONFIG",
-                1: "$DOCKERFILE_BUILDER_PATHS_TARGET_SETUP:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_SETUP",
-                2: "$DOCKERFILE_BUILDER_PATHS_TARGET_CONFIG:$DOCKERFILE_BUILDER_PATHS_DOCKERFILE_CONFIG"
-            }
-        )
-        self.import_env('dockerfile_builder')
-        self.import_files('dockerfile_builder')
-
-    #def build(self):
-
+        # Import configurations
+        config_yaml_path = get_path("{}/{}".format( GLOBALS['locations']['dockerfile-builder'], "config.yaml" ))
+        configurations = get_data_from_yaml(config_yaml_path, True)
+        dict_merge(self.conf, configurations)
+        
         # Import build config
-        build_yaml = get_path("{}/{}".format( GLOBALS['locations']['pwd'], GLOBALS['dockerfile-builder']['config']['file']['name'] ))
-        self.conf = get_data_from_yaml(build_yaml,True)
-
-
-        #
-        # ENV
-        #
-        print_message('Importing enviroment variables')
-        # Build env vars
-        self.import_env('general')
-        # Build build vars
-        self.import_env('build')
-        # Build setup vars
-        self.import_env('setup')
-        # Build config vars
-        self.import_env('config')
-        # Build config vars
-        self.import_env('test')
-
+        build_yaml = get_path("{}/{}".format( GLOBALS['locations']['pwd'], self.conf['file']['name'] ))
+        build_config = get_data_from_yaml(build_yaml, True)
+        # Merge build over defaults
+        build_config = dict_merge(self.conf['defaults'], build_config)
+        # Import build conf in conf
+        self.conf = dict_merge(self.conf, build_config)
+        # Duplicate test for travis build
+        self.conf['travis'] = self.conf['test']
+        
         #
         # IMPORT
         #
+        # Build env vars for every stage
+        print_message('Importing enviroment variables')
+        self.import_envvars()
+        # Import files
         print_message('Importing files in build')
-        self.import_files('build')
-
-        #
-        # PROCESSES
-        #
-        print_message('Importing processes')
+        self.import_files()
         # Build setup processes
-        self.build_processes('setup')
-        # Build config processes
-        self.build_processes('config')
-        # Build test processes
-        self.build_processes('test')
+        print_message('Importing processes')
+        self.build_processes()
 
-        # Duplicate test for travis 
-        self.conf['travis'] = self.conf['test']
-        # Build travis processes
-        self.build_processes('travis', ' - ', "    ")
-
-
+    def build(self):
         #
         # BUILD
+        # Building files from templates
         #
+        self.build_project_env()
+        self.build_builder_env()
+        self.build_travis_env()
         
-        # Build env file
-        print_message('Building enviroment file')
-
-        docker_env  = "ENV"
-        for envvar in self.docker_envvars:
-            docker_env += " \\\n\t" + envvar 
-        export_var('DOCKERFILE_BUILDER_ENVVARS', docker_env)
-
-        # Expose ports
-        docker_ports=""
-        if 'ports' in self.conf['build']['envvars']['dockerfile']:
-
-            additional = ""
-            if 'additional' in self.conf['build']['envvars']['dockerfile']['ports']:
-                additional = parse_content(self.conf['build']['envvars']['dockerfile']['ports']['additional'])
-            export_var('BUILD_DOCKERFILE_PORTS_ADDITIONAL', additional)
-
-            docker_ports = "EXPOSE {main} {additional}".format(
-                main=os.environ['BUILD_DOCKERFILE_PORTS_MAIN'],
-                additional=os.environ['BUILD_DOCKERFILE_PORTS_ADDITIONAL']
-            )
-        export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
-
-        #self.eval_template('env')
-        self.eval_template('dockerconfig')
-
-        # Build setup file
-        print_message('Building setup file')
-        self.eval_template('setup')
-        #GLOBALS['dockerfile-builder']['templates']['setup'], GLOBALS['dockerfile-builder']['target']['path']['setup'])
-
-        # Build config file
-        print_message('Building config file')
-        self.eval_template('config')
-        #self.eval_template(GLOBALS['dockerfile-builder']['templates']['config'], GLOBALS['dockerfile-builder']['target']['path']['config'])
-
-        # Build docker file
-        print_message('Building dockerfile')#{file}'.format(file=GLOBALS['dockerfile-builder']['target']['path']['dockerfile']))
-
-        # ENTRYPOINT (deprecated)
-        #entrypoint = ""
-        #if 'entrypoint' in self.conf['build']['envvars']['dockerfile']:
-        #    entrypoint = 'ENTRYPOINT ["{entrypoint}"]'.format(entrypoint=self.conf['build']['envvars']['dockerfile']['entrypoint'])
-        #export_var('DOCKERFILE_BUILDER_ENTRYPOINT', entrypoint)
-
-        # CMD -> Move to docker-run bin
-        cmd=""
-        if 'cmd' in self.conf['build']['envvars']['dockerfile']:
-            cmd='CMD ["{config_script} && {cmd}"]'.format(
-                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['dockerconfig'],
-                cmd=self.conf['build']['envvars']['dockerfile']['cmd']
-            )
-        else:
-            cmd='CMD ["{config_script}"]'.format(
-                config_script=GLOBALS['dockerfile-builder']['envvars']['paths']['dockerfile']['dockerconfig'],
-            )
-        export_var( 'DOCKERFILE_BUILDER_CMD', cmd )
-
-         # WORKDIR
-        workdir=""
-        if 'workdir' in self.conf['build']['envvars']['dockerfile']:
-            workdir='WORKDIR {workdir}'.format(workdir=self.conf['build']['envvars']['dockerfile']['workdir'])
-        export_var( 'DOCKERFILE_BUILDER_WORKDIR', workdir )
-
-        self.eval_template('dockerfile')#GLOBALS['dockerfile-builder']['templates']['dockerfile'], GLOBALS['dockerfile-builder']['target']['path']['dockerfile'])
-
-        # Build test file
-        print_message('Building test file')
-        self.eval_template('test', 0o764)
-
-        # Build travis
-        print_message('Building travis file')
-        self.eval_template('travis')
-
-        print_message('Verify travis file')
-        self.verify_test_file()
-
-        # dockerignore
-        self.eval_template('dockerignore')
-
-        # GIT ignore
-        if os.environ['BUILD_BRANCH'] == 'master':
-            self.eval_template('master_gitignore')
-            self.eval_template('git_deploy_branches', 0o764)
-
-        # README
-        self.create_readme()
-
+        print_message('Building files')
+        cur_branch = os.environ['BUILD_BRANCH']
+        if cur_branch not in self.conf['builder']['branch2templates']:
+            cur_branch = 'default'
+        other_branches = list(self.conf['builder']['branch2templates'].keys())
+        other_branches.remove(cur_branch)
+        
+        # Remove other branch templates
+        for other_branch in other_branches:
+            for template in self.conf['builder']['branch2templates'][other_branch]:
+                self.rm_template_target(template['key'])
+            
+        if os.environ['BUILD_BRANCH'] != 'master':
+            self.verify_test_file()
+            
+        # Create cur branch templates
+        for template in self.conf['builder']['branch2templates'][cur_branch]:
+            key = template['key']
+            if 'mode' in template:
+                mode = int(str(template['mode']), 8)
+            else:
+                mode = None
+            self.eval_template(key, mode)
+        
         print_success("Completed")
 
 # ---------
 
 # Init
 builder = Builder()
+# Build
+builder.build()

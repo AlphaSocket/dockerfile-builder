@@ -1,10 +1,10 @@
 #!/bin/sh
 #
-# Run all confiugration scripts
+# Run all configuration scripts
 #
 set -e
 
-for config_script in ${DOCKERFILE_BUILDER_PATHS_DOCKERFILE_FOLDERS_CONFIG}/*; 
+for config_script in ${BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG}/*; 
 do
     $config_script 1>/dev/stdout 2>/dev/stderr; 
 done;

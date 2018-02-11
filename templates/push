@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Script that retag and push test docker images to prd user
+#
+
+# exit if a command fails
+set -e
+
+DOCKER=$(which docker)
+
+if [ DOCKER = '' ]; then
+    echo 'Docker is required\n'
+    exit 1
+fi
+
+#
+# LOGIN
+#
+LOGGED_IN=$( docker info | grep -q "Username: ${PUSH_DOCKER_USER}" && echo "true")
+if [ "$LOGGED_IN" != "true" ];
+then 
+    if [ ! -z "$DOCKER_PASSWORD" ] ;
+    then
+        # Automated push
+        docker login -u "$PUSH_DOCKER_USER" -p "$DOCKER_PASSWORD" ${PUSH_DOCKER_REGISTRY};
+    else
+        docker login -u "$PUSH_DOCKER_USER" ${PUSH_DOCKER_REGISTRY};
+    fi
+fi
+
+#
+# RE-TAG the dev image to prd usr
+#
+docker tag ${PUSH_DOCKER_DEV_USER}/${BUILD_NAME}:${BUILD_VERSION} \
+    ${PUSH_DOCKER_USER}/${PUSH_IMAGE_NAME}:${PUSH_IMAGE_VERSION};
+
+#
+# PUSH
+#
+echo "#\n# Pushing image\n#\n"
+docker push ${PUSH_DOCKER_REGISTRY}/${PUSH_DOCKER_USER}/${PUSH_IMAGE_NAME}:${PUSH_IMAGE_VERSION};
+exit $?

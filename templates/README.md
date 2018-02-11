@@ -1,8 +1,12 @@
 # ${PROJECT_TITLE}
 #### ${PROJECT_CODENAME}
-[![](https://travis-ci.org/AlphaSocket/dockerized-${PROJECT_CODENAME}.svg?branch=${PROJECT_VERSION} )]() [![](https://images.microbadger.com/badges/image/${TEST_DOCKERFILE_TAG_USER}/dockerized-${TEST_DOCKERFILE_TAG_NAME}:${PROJECT_VERSION}.svg)](https://microbadger.com/images/${TEST_DOCKERFILE_TAG_USER}/dockerized-${TEST_DOCKERFILE_TAG_NAME}:${PROJECT_VERSION} ) [![](https://images.microbadger.com/badges/version/${TEST_DOCKERFILE_TAG_USER}/dockerized-${TEST_DOCKERFILE_TAG_NAME}:${PROJECT_VERSION}.svg)](https://microbadger.com/images/${TEST_DOCKERFILE_TAG_USER}/dockerized-${TEST_DOCKERFILE_TAG_NAME}:${PROJECT_VERSION})
-
 ${PROJECT_DESCRIPTION}
+
+
+| [![Build Status](https://semaphoreci.com/api/v1/${GENERAL_DOCKER_USERS_PRD}/dockerized-${PROJECT_CODENAME}/branches/${BUILD_VERSION}/badge.svg)](https://semaphoreci.com/${GENERAL_DOCKER_USERS_PRD}/dockerized-${PROJECT_CODENAME}) | Layers | Size  |
+| ----- | ----- | ----- |
+| Dev image | [![](https://images.microbadger.com/badges/image/${GENERAL_DOCKER_USERS_DEV}/dockerized-${BUILD_NAME}:${BUILD_VERSION}.svg)](https://microbadger.com/images/${GENERAL_DOCKER_USERS_DEV}/${BUILD_NAME}:${BUILD_VERSION} ) | [![](https://images.microbadger.com/badges/version/${GENERAL_DOCKER_USERS_DEV}/dockerized-${BUILD_NAME}:${BUILD_VERSION}.svg)](https://microbadger.com/images/${GENERAL_DOCKER_USERS_DEV}/${BUILD_NAME}:${BUILD_VERSION}) |
+| Prd image | [![](https://images.microbadger.com/badges/image/${GENERAL_DOCKER_USERS_PRD}/${BUILD_NAME}:${BUILD_VERSION}.svg)](https://microbadger.com/images/${GENERAL_DOCKER_USERS_PRD}/${BUILD_NAME}:${BUILD_VERSION} ) | [![](https://images.microbadger.com/badges/version/${GENERAL_DOCKER_USERS_PRD}/${BUILD_NAME}:${BUILD_VERSION}.svg)](https://microbadger.com/images/${GENERAL_DOCKER_USERS_PRD}/${BUILD_NAME}:${BUILD_VERSION}) |
 
 ## Branches & Versions
 ${PROJECT_VERSIONS}
@@ -13,5 +17,3 @@ ${PROJECT_PACKAGES}
 ## Configurable envvars
 ~~~
 ${PROJECT_CONF_ENVVARS}~~~
-
-
