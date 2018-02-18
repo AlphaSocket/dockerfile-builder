@@ -12,7 +12,7 @@ if [ DOCKER = '' ]; then
 fi
 
 echo "#\n# Warming cache\n#\n"
-for image in "${DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES}"
+for image in ${DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES}
 do 
     docker pull ${image} 1>/dev/null;
 done
