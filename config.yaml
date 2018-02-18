@@ -40,6 +40,14 @@ defaults:
     description: "Project description"
 
   #
+  # Cache data:
+  # ex: All docker images used for build and test
+  #
+  cache:
+    envvars:
+      main:
+        valueFromParse: $BUILD_FROM
+  #
   # Builder stage:
   #
   # Configuration for the builder
@@ -73,6 +81,8 @@ defaults:
           # Extra binaries used to manage repo and create image
           bin_git_deploy_branches:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/deploy-branches"
+          bin_cache_warm:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/cache-warm"
           bin_build:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/build"
           bin_test:
@@ -88,6 +98,10 @@ defaults:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-config"
           imports_docker_run:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-run"
+          imports_docker_rediness_test:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-rediness-test"
+          imports_docker_liveness_test:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_DOCKERFILE_BINARIES/docker-liveness-test"
         container:
           setup:
             valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_SETUP/$(date +%s)"'
@@ -97,8 +111,11 @@ defaults:
             valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-config"'
           docker_run:
             valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-run"'
+          docker_rediness_test:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-rediness-test"'
+          docker_liveness_test:
+            valueFromCommand: 'echo "$BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES/docker-liveness-test"'
           
-
     # File read to build
     file:
       name: "dockerfile-builder.yaml"
@@ -114,6 +131,7 @@ defaults:
       travis: "travis"
       # Templates for binaries used to manage docker image ad repo
       bin_git_deploy_branches: "deploy-branches"
+      bin_cache_warm: "cache-warm"
       bin_build: "build"
       bin_test: "test"
       bin_push: "push"
@@ -122,6 +140,9 @@ defaults:
       imports_config: "config"
       imports_docker_config: "docker-config"
       imports_docker_run: "docker-run"
+      imports_docker_rediness_test: "docker-rediness-test"
+      imports_docker_liveness_test: "docker-liveness-test"
+    # Define which templates must be built for each branch
     branch2templates:
       master:
         - key: readme
@@ -135,6 +156,10 @@ defaults:
           mode: 754
         - key: imports_docker_run
           mode: 754
+        - key: imports_docker_rediness_test
+          mode: 754
+        - key: imports_docker_liveness_test
+          mode: 754
         - key: imports_setup
           mode: 754
         - key: imports_config
@@ -144,6 +169,8 @@ defaults:
         - key: dockerignore
         - key: travis
         # Build extra files to build test and push
+        - key: bin_cache_warm
+          mode: 754
         - key: bin_build
           mode: 754
         - key: bin_test
@@ -151,10 +178,19 @@ defaults:
         - key: bin_push
           mode: 754
     imports:
-      - "bin/docker-config:$BUILDER_TARGETS_CONTAINER_DOCKER_CONFIG"
-      - "bin/docker-run:$BUILDER_TARGETS_CONTAINER_DOCKER_RUN"
-      - "bin/setup:$BUILDER_TARGETS_CONTAINER_SETUP"
-      - "bin/config:$BUILDER_TARGETS_CONTAINER_CONFIG"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_DOCKER_CONFIG:$BUILDER_TARGETS_CONTAINER_DOCKER_CONFIG"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_DOCKER_RUN:$BUILDER_TARGETS_CONTAINER_DOCKER_RUN"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_DOCKER_REDINESS_TEST:$BUILDER_TARGETS_CONTAINER_DOCKER_REDINESS_TEST"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_DOCKER_LIVENESS_TEST:$BUILDER_TARGETS_CONTAINER_DOCKER_LIVENESS_TEST"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_SETUP:$BUILDER_TARGETS_CONTAINER_SETUP"
+      - "$BUILDER_TARGETS_BUILD_IMPORTS_CONFIG:$BUILDER_TARGETS_CONTAINER_CONFIG"
+      
+  cache:
+    envars: {}
+    docker_images:
+      - $BUILD_FROM
+    processes: {}
+  
   #
   # Build stage:
   # Creating files from templates
@@ -181,7 +217,7 @@ defaults:
         valueFromCommand: 'env=$(echo $BUILD_BRANCH | cut -d \- -f 2); [ "$env" = "$BUILD_VERSION" ] && echo $GENERAL_KEYS_PRD || echo $env'
       from: alpine:latest
       ports:
-        main: 80
+        main: ""
         additional: ""
     imports: []
         
@@ -207,7 +243,14 @@ defaults:
   # Scripts run to configure the container before run
   #
   config:
-    envvars: {}
+    envvars:
+      rediness:
+        test: "true"
+      liveness:
+        test: "true"
+      paths:
+        container:
+          status: /tmp/container_status
       #user: 'docker'
       #group: 'docker'
     processes: []
@@ -223,10 +266,17 @@ defaults:
   test:
     envvars:
       container:
+        ports:
+          main:
+            valueFromParse: $BUILD_PORTS_MAIN
+          additional:
+            valueFromParse: $BUILD_PORTS_ADDITIONAL
+            
         name:
           valueFromParse: $BUILD_NAME
       host:
-        port: 30000
+        port:
+          valueFromCommand: "shuf -i 30000-32000 -n 1"
       image:
         user:
           valueFromParse: $BUILD_USER

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { exec } = require('child_process');
-let dockerHubAPI = require('docker-hub-api');
+let dockerHubAPI = require('docker-hub-api'); //https://www.npmjs.com/package/docker-hub-api
 //let semaphoreCiAPI = require('semaphore-ci-api');//   <- exists ??
 
 let dockerDevUser=procevv.

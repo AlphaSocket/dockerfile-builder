@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+
+from Globals import *
+from collections import OrderedDict
+
+a = OrderedDict({ 'a': 1, 'b':2 })
+b = OrderedDict({ 'b': 3 })
+
+c = dict_merge(a, b)
+test = OrderedDict({ 'b': 3, 'a':1 })
+
+
+
+if dict_compare(c, test) == 0 :
+    print('Test succeded')
+else:
+    print('Test failed')
+    print( c, ' != ', test)
+
+dict_0 = { 'b': 1, 'c': 2 , 'a': 10 }
+a =  OrderedDict(dict_0)
+print( a )
+

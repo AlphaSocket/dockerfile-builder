@@ -10,12 +10,12 @@ set -e
 CURL=$(which curl)
 DOCKER=$(which docker)
 
-if [ CURL = '' ]; then
+if [ "$CURL" = '' ]; then
     echo 'The package curl is required\n'
     exit 1
 fi
 
-if [ DOCKER = '' ]; then
+if [ "$DOCKER" = '' ]; then
     echo 'Docker is required\n'
     exit 1
 fi

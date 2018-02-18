@@ -2,12 +2,13 @@
 #
 # Run command
 #
-set -xe
+set -e
 
-echo "### Start container configuration\n"
+# Configuration
 $(which docker-config)
-echo "### Finished container configuration\n"
 
-echo "### Start container command"
-${BUILD_CMD}
+echo "### Starting container service"
+sh -c "${BUILD_CMD}"
+
+# Container command is failed if exiting here
 exit $?

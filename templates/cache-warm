@@ -1,0 +1,20 @@
+#!/bin/sh
+
+#
+# Warm cache for build and test processes
+#
+
+DOCKER=$(which docker)
+
+if [ DOCKER = '' ]; then
+    echo 'Docker is required\n'
+    exit 1
+fi
+
+echo "#\n# Warming cache\n#\n"
+for image in "${DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES}"
+do 
+    docker pull ${image} 1>/dev/null;
+done
+
+exit 0

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Readiness test
+#
+set -e
+
+CONTAINER_STATUS=$( cat $CONFIG_PATHS_CONTAINER_STATUS )
+if [ "$CONTAINER_STATUS" != 'ready' ]; then
+    exit 1;
+fi
+
+if [ -z "${CONFIG_REDINESS_TEST}" ]; then
+    exit 1;
+fi
+
+sh -c "${CONFIG_REDINESS_TEST}"
+exit $?

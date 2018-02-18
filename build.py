@@ -37,6 +37,8 @@ class Builder():
         return result
 
     def import_stage_env(self, stage, parse=True):
+        # CHeck if all var are parsed
+        all_parsed = True
         if 'envvars' in self.conf[stage]:
             envvars = self.conf[stage]['envvars']
             envvars = self.resolve_env_var(envvars)
@@ -47,19 +49,45 @@ class Builder():
                 if value is None:
                     value = ""
                 if parse is True:
-                    value = parse_content(value)
-                export_var(name,value)
-
+                    #print('parsing var: ',name,value, is_parsable(value), parse_content(value) )
+                    if is_parsable(value):
+                        if 'valueFromCommand' in value:
+                            unparsed_value = value['valueFromCommand']
+                        elif 'valueFromParse' in value:
+                            unparsed_value = value['valueFromParse']
+                        else:
+                            unparsed_value = ""
+                        #print('Unparsed and value: ',unparsed_value,value)
+                        parsed_value = parse_content(value)
+                        
+                        if unparsed_value != parsed_value and 'OrderedDict' not in str(parsed_value):
+                            value = parsed_value
+                            export_var(name,value)
+                        else:
+                            all_parsed = False
+                    else:
+                        export_var(name,value)
+                
+                #print('exporting var: ',name,value)
+                
                 # Keep a list of stage envvars in builder envvars
                 if stage not in self.envvars:
                     self.envvars[stage] = OrderedDict()
                 self.envvars[stage][name] = value
                 concat = concat + '{name}="{value}"\n'.format(name=name,value=value)
-
+                
                 if stage in ['general', 'build', 'setup', 'config']:
-                    self.docker_envvars.append('{name}="{value}"'.format(name=name,value=value))
+                    # Workaround quotes
+                    if type(value) is str and value.startswith("'") and value.endswith("'"):
+                        # Single quotes
+                        self.docker_envvars.append("{name}={value}".format(name=name,value=value))
+                    else:
+                        # Double quotes
+                        self.docker_envvars.append('{name}="{value}"'.format(name=name,value=value))
+                    # Workaround strings
 
             export_var('DOCKERFILE_BUILDER_{stage}_ENVVARS'.format(stage=stage.upper()), concat)
+        return all_parsed
 
     def import_stage_files(self, stage):
         if 'imports' in self.conf[stage]:
@@ -68,15 +96,21 @@ class Builder():
             if type(files) is list:
                 files = list_to_dict(files)
 
-            ## Breaking format source:target
+            # Breaking format source:target
             for key,value in files.items():
                 value = os.path.expandvars(value)
                 paths = value.split(':')
-                source_path = '{0}/{1}'.format(
-                    os.environ['BUILDER_TARGETS_FOLDERS_BUILD_IMPORTS'],
-                    paths[0]
-                )
+                
+                source_path = paths[0]
                 build_path = paths[1]
+                
+                prefix = os.environ['BUILDER_TARGETS_FOLDERS_BUILD_IMPORTS'] + '/'
+                
+                if source_path[0:len(prefix)] != prefix:
+                    source_path = '{0}/{1}'.format(
+                        os.environ['BUILDER_TARGETS_FOLDERS_BUILD_IMPORTS'],
+                        source_path
+                    )
                 
                 ## Add file by file to not override previous injected files
                 if source_path and build_path:
@@ -88,23 +122,6 @@ class Builder():
                         tree = self.build_folder_imports(source_path, build_path);
                         for file_source_path, file_build_path in tree:
                             self.docker_imports.append({"source":file_source_path, "target":file_build_path})
-
-            concat = ""
-            for imported in self.docker_imports:
-                concat += "ADD {source} {target}\n".format(
-                    source=imported['source'],
-                    target=imported['target']
-                )
-            
-            value = ""
-            if 'DOCKERFILE_BUILDER_IMPORTS' in os.environ:
-                value = os.environ['DOCKERFILE_BUILDER_IMPORTS'] + concat;
-                del os.environ['DOCKERFILE_BUILDER_IMPORTS']
-            else:
-                value = concat;
-                
-            # Exporting env variable
-            export_var('DOCKERFILE_BUILDER_IMPORTS', concat) # don't know.. python magic
 
     def build_folder_imports(self, source_path, build_path):
         tree=[]
@@ -135,7 +152,6 @@ class Builder():
         # Export var to env
         export_var('{stage}_PROCESSES'.format(stage=stage.upper()), imploded_processes)
 
-    # Implode processes
     def implode_processes(self, processes, commands_prefix="", row_prefix=""):
         concat = ""
 
@@ -159,9 +175,9 @@ class Builder():
                             )
                 
             if 'else' in process:
-                else_commands = "else "
+                else_commands = "else \n    "
                 for else_command in process['else']:
-                    else_commands = "{else_command}{command_suffix}".format(
+                    else_commands += "    {else_command}{command_suffix}".format(
                                 else_command=else_command,
                                 command_suffix=command_suffix
                             )
@@ -221,6 +237,7 @@ class Builder():
             print_error('Invalid travis file')
             exit(1)
 
+
     def build_builder_env(self):
         # Build args
         docker_args = ""
@@ -240,19 +257,31 @@ class Builder():
 
         # Expose ports
         docker_ports=""
-        if 'ports' in self.conf['build']['envvars']:
-
+        if 'ports' in self.conf['build']['envvars'] and bool(os.environ['BUILD_PORTS_MAIN']):
             docker_ports = "EXPOSE {main} {additional}".format(
                 main=os.environ['BUILD_PORTS_MAIN'],
                 additional=os.environ['BUILD_PORTS_ADDITIONAL']
             )
         export_var('DOCKERFILE_BUILDER_PORTS', docker_ports)
 
-         # WORKDIR
+        # WORKDIR
         workdir=""
         if 'workdir' in self.conf['build']['envvars']:
             workdir='WORKDIR {workdir}'.format(workdir=os.environ['BUILD_WORKDIR'])
         export_var( 'DOCKERFILE_BUILDER_WORKDIR', workdir )
+        
+        # IMPORTS
+        concat = ""
+        for imported in self.docker_imports:
+            concat += "ADD {source} {target}\n".format(
+                source=imported['source'],
+                target=imported['target']
+            )
+        # Exporting env variable
+        export_var('DOCKERFILE_BUILDER_IMPORTS', concat)
+        
+        # CACHE docker images
+        export_var('DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES', os.path.expandvars(' '.join(self.conf['cache']['docker_images'])))
         
     def build_project_env(self):
         os.environ['PROJECT_TITLE'] = self.conf['project']['title']
@@ -288,7 +317,7 @@ class Builder():
                         if not bool(package):
                             package = 'None'
                         os.environ['PROJECT_PACKAGES'] += "  + {package}\n".format(package=package)
-    
+                        
     def build_travis_env(self):
         if 'TEST_NOTIFICATION_WEBHOOK' in os.environ and bool(os.environ['TEST_NOTIFICATION_WEBHOOK']):
             notification_value="notifications:\n    webhooks: " + os.environ['TEST_NOTIFICATION_WEBHOOK']
@@ -307,15 +336,19 @@ class Builder():
         stages.append('config')
         stages.append('test')
         stages.append('push')
+        stages.append('cache')
 
-        # Import var without parsing
-        for stage in stages:
-            self.import_stage_env(stage, False)
-        # Reset docker_envvars
-        self.docker_envvars = []
-        # Import var parsing data correctly (having already the value for early run)
-        for stage in stages:
-            self.import_stage_env(stage)
+        # Import env var until all unparsed values are parsed
+        all_parsed = False
+        while all_parsed is False:
+            # Reset docker_envvars
+            self.docker_envvars = []
+            # Import var parsing data correctly (having already the value for early run)
+            all_parsed = True
+            for stage in stages:
+                result = self.import_stage_env(stage)
+                if result is False:
+                    all_parsed = False
         
     def import_files(self):
         self.import_stage_files('builder')
@@ -330,6 +363,8 @@ class Builder():
         self.build_stage_processes('test')
          # Build travis processes
         self.build_stage_processes('travis', ' - ', "    ")
+        
+        
         
     def __init__(self):
 
@@ -350,6 +385,11 @@ class Builder():
         build_config = dict_merge(self.conf['defaults'], build_config)
         # Import build conf in conf
         self.conf = dict_merge(self.conf, build_config)
+        
+        # import pprint
+        # pp = pprint.PrettyPrinter(indent=0)
+        # pp.pprint( self.conf )
+        
         # Duplicate test for travis build
         self.conf['travis'] = self.conf['test']
         

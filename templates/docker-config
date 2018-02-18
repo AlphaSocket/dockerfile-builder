@@ -4,9 +4,22 @@
 #
 set -e
 
+touch $CONFIG_PATHS_CONTAINER_STATUS
+if [ ! -f "$CONFIG_PATHS_CONTAINER_STATUS" ];
+then
+    echo "Error: Can't create container_status file $CONFIG_PATHS_CONTAINER_STATUS";
+    exit 1;
+fi
+
+echo "### Starting container configuration"
+echo "running_config" > $CONFIG_PATHS_CONTAINER_STATUS
+
 for config_script in ${BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG}/*; 
 do
     $config_script 1>/dev/stdout 2>/dev/stderr; 
 done;
+
+echo "### Finished container configuration"
+echo "ready" > $CONFIG_PATHS_CONTAINER_STATUS
 
 exit 0
