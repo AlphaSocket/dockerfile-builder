@@ -18,6 +18,7 @@ class Builder():
     envvars = OrderedDict()
     docker_imports = []
     docker_envvars = []
+    unparsed_variables = {}
     
     def resolve_env_var(self, envvars):
         result = OrderedDict()
@@ -62,8 +63,11 @@ class Builder():
                         
                         if unparsed_value != parsed_value and 'OrderedDict' not in str(parsed_value):
                             value = parsed_value
+                            if name in self.unparsed_variables:
+                                del(self.unparsed_variables[name])
                             export_var(name,value)
                         else:
+                            self.unparsed_variables[name] = unparsed_value
                             all_parsed = False
                     else:
                         export_var(name,value)
@@ -340,7 +344,14 @@ class Builder():
 
         # Import env var until all unparsed values are parsed
         all_parsed = False
+        counter = 0
         while all_parsed is False:
+            counter += 1
+            # Put a limit to while cycle
+            if counter >= 15:
+                for name,unparsed_value in self.unparsed_variables.items():
+                    print_error("Error: can't parse value \"{}\" for {} ".format(unparsed_value, name) )
+                exit(1)
             # Reset docker_envvars
             self.docker_envvars = []
             # Import var parsing data correctly (having already the value for early run)
