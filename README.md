@@ -30,21 +30,31 @@ export DOCKER_DEV_REGISTRY='docker-prd-registry'
 
 ## Usage
 
-### Build first dockerfile
+### Build Files
 - Place a `dockerfile-builder.yaml` file in the project folder
 - init git repo
     + `git init`
 - Create branches (latest branch is required)
     + `git branch {branch-name}`
-- Edit `dockerfile-builder.yaml`
+- Edit `dockerfile-builder.yaml` adding all env vars and processes needed to
+    + Build the docker image
+    + Build the docker image
+    + Run tests to verify on the image
+- Run `dockerfile-build` on master
+- Deploy changes and rebuild other branches running `bin/deploy-branches` on master
 
-### Configure automated builds - (In progress)
-- `bin/configure-automated-builds`
-
-### Build files
-- `bin/dockerfile-build`
-
-### Deploy to other branches
-- bin/deploy-branches
+### Configure CI
+- Go on your favourite CI and setup the build using files created
+Ex:
+~~~
+# Move to the branch you want to build
+- git checkout latest
+# Build the docker image
+- bin/build
+# Test the image
+- bin/test
+# Push the image in the registry if test succeded
+- bin/push
+~~~
 
 
