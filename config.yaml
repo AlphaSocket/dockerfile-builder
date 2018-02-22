@@ -4,6 +4,48 @@
 file:
   name: dockerfile-builder.yaml
 
+# Stages
+stages:
+  project:
+    desc: "Project data"
+    expand_vars: False
+  builder:
+    desc: "Configurations used during the dockerfile build"
+    expand_vars:
+      processes: False
+  general:
+    desc: "General data used as base in other stages"
+    expand_vars:
+      processes: False
+  build:
+    desc: "Data and configurations used during Dockerfile build"
+    expand_vars:
+      processes: False
+  setup:
+    desc: "Data and configurations used during docker image creation"
+    expand_vars:
+      processes: False
+  config:
+    desc: "Data and configurations used during container configuration"
+    expand_vars:
+      processes: False
+  cache:
+    desc: "Data and configurations used to speed up testing process warming the cache"
+    expand_vars:
+      processes: True
+  test:
+    desc: "Data and configurations used during container testing"
+    expand_vars:
+      processes: True
+  travis:
+    desc: "Data and configurations used during container testing on travis"
+    expand_vars:
+      processes: True
+  push:
+    desc: "Data and configurations used during image pushing process"
+    expand_vars:
+      processes: True
+    
 # Defaults values used as base for dockerfile-builds
 defaults:
   #
@@ -87,6 +129,8 @@ defaults:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/build"
           bin_test:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/test"
+          bin_test_container:
+            valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/test_container"
           bin_push:
             valueFromParse: "$BUILDER_TARGETS_FOLDERS_BUILD_BINARIES/push"
           # Binaries used in docker-build and containers
@@ -134,11 +178,13 @@ defaults:
       bin_cache_warm: "cache-warm"
       bin_build: "build"
       bin_test: "test"
+      bin_test_container: "test_container"
       bin_push: "push"
       # Templates for binaries used in container
       imports_setup: "setup"
       imports_config: "config"
       imports_docker_config: "docker-config"
+      imports_docker_config_users_groups: "docker-config-users-groups"
       imports_docker_run: "docker-run"
       imports_docker_rediness_test: "docker-rediness-test"
       imports_docker_liveness_test: "docker-liveness-test"
@@ -175,6 +221,8 @@ defaults:
           mode: 754
         - key: bin_test
           mode: 754
+        - key: bin_test_container
+          mode: 754
         - key: bin_push
           mode: 754
     imports:
@@ -184,12 +232,10 @@ defaults:
       - "$BUILDER_TARGETS_BUILD_IMPORTS_DOCKER_LIVENESS_TEST:$BUILDER_TARGETS_CONTAINER_DOCKER_LIVENESS_TEST"
       - "$BUILDER_TARGETS_BUILD_IMPORTS_SETUP:$BUILDER_TARGETS_CONTAINER_SETUP"
       - "$BUILDER_TARGETS_BUILD_IMPORTS_CONFIG:$BUILDER_TARGETS_CONTAINER_CONFIG"
-      
   cache:
     envars: {}
     docker_images:
       - $BUILD_FROM
-    processes: {}
   
   #
   # Build stage:
@@ -227,15 +273,30 @@ defaults:
   #
   setup:
     envvars:
+      paths:
+        binaries:
+          valueFromParse: $BUILDER_TARGETS_FOLDERS_CONTAINER_BINARIES
+        setup:
+          valueFromParse: $BUILDER_TARGETS_FOLDERS_CONTAINER_SETUP
+        config:
+          valueFromParse: $BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG
       dependencies:
         setup: ""
         config: ""
+        runtime: ""
     # Setup Processes
-    processes:
-      - title: "Install dependencies"
-        shell_condition: '! -z "$SETUP_DEPENDENCIES_CONFIG$SETUP_DEPENDENCIES_SETUP"'
+    processes_before: 
+      - title: "Install all dependencies"
         commands:
-          - "apk add --no-cache $SETUP_DEPENDENCIES_CONFIG $SETUP_DEPENDENCIES_SETUP"
+          - "apk add --no-cache gettext $SETUP_DEPENDENCIES_SETUP $SETUP_DEPENDENCIES_CONFIG $SETUP_DEPENDENCIES_RUNTIME"
+    
+    processes: []
+    
+    processes_after: []
+      #- title: "Remove unecessary dependencies"
+      #  commands:
+      #    - UNNECESSARY_DEPENDENDCY_SETUP=$( )
+      #    - "apk del $SETUP_DEPENDENCIES_SETUP"
       
       
   #
@@ -244,6 +305,22 @@ defaults:
   #
   config:
     envvars:
+      groups:
+        main:
+          id: 1000
+          name: 'docker'
+        additional:
+          id: 1001
+          name: ''
+      users:
+        main:
+          id: 1000
+          name: 'docker'
+          groups: 'docker'
+        additional:
+          id: 1001
+          name: ''
+          groups: ''
       rediness:
         test: "true"
       liveness:
@@ -251,13 +328,12 @@ defaults:
       paths:
         container:
           status: /tmp/container_status
-      #user: 'docker'
-      #group: 'docker'
+    processes_before: []
     processes: []
-      #- title: "Setup user and group"
-      #  commands:
-      #    - addgroup -S "$CONFIG_GROUP"
-      #    - adduser -S "$CONFIG_USER" "$CONFIG_GROUP"
+    processes_after:
+      - title: "Remove unecessary dependencies"
+        commands:
+          - "apk del $SETUP_DEPENDENCIES_CONFIG"
 
   #
   # Test stage:

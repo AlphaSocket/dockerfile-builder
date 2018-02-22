@@ -1,0 +1,56 @@
+#
+# Groups
+#
+
+#
+# HARDENING
+# Remove unused users
+#
+UNUSED_USER="daemon adm lp sync shutdown halt postmaster cyrus mail news uucp operator man cron ftp sshd at squid xfs games postgres vpopmail ntp smmsp guest"
+for UNUSED_USER in $UNUSED_USERS
+do
+    # Remove user if exists 
+    if id -u "$UNUSED_USER"; then
+        deluser --remove-home "$UNUSED_USER";
+    fi;
+done
+
+#
+# Setting up container users and groups
+#
+for KIND in "MAIN" "ADDITIONAL"
+do
+    # GROUPS
+    GROUP_NAME=$( echo "\$CONFIG_GROUPS_${KIND}_NAME" | envsubst )
+    GROUP_ID=$( echo "\$CONFIG_GROUPS_${KIND}_ID" | envsubst )
+    
+    # Clean and add group
+    if [ ! -z "$GROUP_NAME" ] && [ ! -z "$GROUP_ID" ]; then
+        if getent group "$GROUP_NAME"; then
+            # Remove users from group
+            GROUP_USERS=$( getent group "$GROUP_NAME" | cut -d \: -f 4 | sed 's/,/ /g' )
+            for GROUP_USER in $GROUP_USERS; do deluser "$GROUP_USER"; done
+        else
+            # Remove group
+            delgroup "$GROUP_NAME";
+        fi
+        # Add main group
+        addgroup -g "$GROUP_ID" -S "$GROUP_NAME";
+    fi
+    
+    # USERS
+    USER_NAME=$( echo "\$CONFIG_USERS_${KIND}_NAME" | envsubst )
+    USER_ID=$( echo "\$CONFIG_USERS_${KIND}_ID" | envsubst )
+    USER_GROUPS=$( echo "\$CONFIG_USERS_${KIND}_GROUPS" | envsubst )
+    
+    # Clean and add user
+    if  [ ! -z "$USER_NAME" ] && [ ! -z "$USER_ID" ]; then
+        # Remove user if exists 
+        if id -u "$USER_NAME"; then
+            deluser "$USER_NAME";
+        fi
+        # Add user specifing groups
+        adduser -u "$USER_ID" -S "$USER_NAME" -G "$USER_GROUPS";
+    fi
+    
+done

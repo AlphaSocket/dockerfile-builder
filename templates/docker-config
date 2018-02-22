@@ -14,12 +14,18 @@ fi
 echo "### Starting container configuration"
 echo "running_config" > $CONFIG_PATHS_CONTAINER_STATUS
 
+${DOCKERFILE_BUILDER_GENERATE_USERS_AND_GROUPS_PROCESS}
+
+#
+# Configurations
+#
 for config_script in ${BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG}/*; 
 do
     $config_script 1>/dev/stdout 2>/dev/stderr; 
 done;
 
-echo "### Finished container configuration"
+# End configuration
 echo "ready" > $CONFIG_PATHS_CONTAINER_STATUS
+echo "### Finished container configuration"
 
 exit 0

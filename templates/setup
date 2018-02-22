@@ -1,9 +1,8 @@
 #!/bin/sh
-#
-
-# exit if a command fails
 set -e
 
+${SETUP_PROCESSES_BEFORE}
 ${SETUP_PROCESSES}
+${SETUP_PROCESSES_AFTER}
 
 exit 0

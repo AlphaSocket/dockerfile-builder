@@ -141,20 +141,33 @@ class Builder():
                 tree.append([file_source_path,file_build_path])
         return tree
 
-    def build_stage_processes(self, stage, commands_prefix="", row_prefix=""):
+    def build_all_stage_processes(self, stage, commands_prefix="", row_prefix=""):
+        self.build_stage_processes( stage, 'processes_before' )
+        self.build_stage_processes( stage, 'processes', commands_prefix, row_prefix )
+        self.build_stage_processes( stage, 'processes_after' )
+    
+    def build_stage_processes(self, stage, kind, commands_prefix="", row_prefix=""):
         imploded_processes=""
-        if 'processes' in self.conf[stage]:
+        
+        if kind in self.conf[stage]:
             # Gather processes
-            processes = self.conf[stage]['processes']
+            processes = self.conf[stage][kind]
 
             # Concat processes
             imploded_processes = self.implode_processes(processes,commands_prefix,row_prefix)
 
             # Expand env vars in test files ( Outside container env )
-            if stage in [ 'test', 'travis']:
+            if self.conf['stages'][stage]['expand_vars']['processes'] == True:
                 imploded_processes = os.path.expandvars(imploded_processes)
+                
         # Export var to env
-        export_var('{stage}_PROCESSES'.format(stage=stage.upper()), imploded_processes)
+        export_var(
+            '{stage}_{kind}'.format(
+                stage=stage.upper(),
+                kind=kind.upper()
+            ),
+            imploded_processes
+        )
 
     def implode_processes(self, processes, commands_prefix="", row_prefix=""):
         concat = ""
@@ -200,7 +213,7 @@ class Builder():
         return concat
             
     def eval_template(self, template, mode=None):
-
+        
         template_file = "{builder_path}/{template_folder}/{template_key}".format(
             builder_path=GLOBALS['locations']['dockerfile-builder'],
             template_folder=self.conf['builder']['folders']['templates'],
@@ -213,7 +226,6 @@ class Builder():
         )
         
         prepare_file(target_file)
-        
         target_handler = open(target_file, "w");
 
         with open(template_file, "r") as template_file_handler:
@@ -240,7 +252,6 @@ class Builder():
         if verify_yaml_file(os.environ['BUILDER_TARGETS_BUILD_TRAVIS']) == False:
             print_error('Invalid travis file')
             exit(1)
-
 
     def build_builder_env(self):
         # Build args
@@ -287,6 +298,17 @@ class Builder():
         # CACHE docker images
         export_var('DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES', os.path.expandvars(' '.join(self.conf['cache']['docker_images'])))
         
+        # GENERATE USERS AND GROUPS
+        template="imports_docker_config_users_groups"
+        generate_users_and_groups_process = get_command_output(
+            "cat {builder_path}/{template_folder}/{template_key}".format(
+                builder_path=GLOBALS['locations']['dockerfile-builder'],
+                template_folder=self.conf['builder']['folders']['templates'],
+                template_key=self.conf['builder']['templates'][template]
+            )
+        )
+        export_var('DOCKERFILE_BUILDER_GENERATE_USERS_AND_GROUPS_PROCESS', generate_users_and_groups_process)
+        
     def build_project_env(self):
         os.environ['PROJECT_TITLE'] = self.conf['project']['title']
         os.environ['PROJECT_CODENAME'] = self.conf['project']['codename']
@@ -311,7 +333,7 @@ class Builder():
 
         # Format dependencies
         os.environ['PROJECT_PACKAGES'] = ""
-        for stage in ['setup', 'config']:
+        for stage in ['setup', 'config', 'runtime']:
             label = 'SETUP_DEPENDENCIES_{ucstage}'.format(ucstage=stage.upper())
             if label in os.environ:
                 dependencies = str(os.environ[label]).strip().split()
@@ -367,15 +389,13 @@ class Builder():
         
     def build_processes(self):
         # Build setup processes
-        self.build_stage_processes('setup')
+        self.build_all_stage_processes('setup')
         # Build config processes
-        self.build_stage_processes('config')
+        self.build_all_stage_processes('config')
         # Build test processes
-        self.build_stage_processes('test')
+        self.build_all_stage_processes('test')
          # Build travis processes
-        self.build_stage_processes('travis', ' - ', "    ")
-        
-        
+        self.build_all_stage_processes('travis', ' - ', "    ")
         
     def __init__(self):
 
