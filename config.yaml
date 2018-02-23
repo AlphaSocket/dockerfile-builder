@@ -173,6 +173,9 @@ defaults:
       dockerignore: ".dockerignore"
       master_gitignore: "master.gitignore"
       travis: "travis"
+      # Alpine 
+      alpine_config_users_groups: "alpine-config-users-groups"
+      alpine_hardening: "alpine-hardening"
       # Templates for binaries used to manage docker image ad repo
       bin_git_deploy_branches: "deploy-branches"
       bin_cache_warm: "cache-warm"
@@ -184,7 +187,6 @@ defaults:
       imports_setup: "setup"
       imports_config: "config"
       imports_docker_config: "docker-config"
-      imports_docker_config_users_groups: "docker-config-users-groups"
       imports_docker_run: "docker-run"
       imports_docker_rediness_test: "docker-rediness-test"
       imports_docker_liveness_test: "docker-liveness-test"
@@ -292,11 +294,14 @@ defaults:
     
     processes: []
     
-    processes_after: []
-      #- title: "Remove unecessary dependencies"
-      #  commands:
-      #    - UNNECESSARY_DEPENDENDCY_SETUP=$( )
-      #    - "apk del $SETUP_DEPENDENCIES_SETUP"
+    processes_after: 
+      - title: "Remove unecessary dependencies"
+        commands:
+          - echo "$SETUP_DEPENDENCIES_SETUP" | tr ' ' "\n" > /tmp/A
+          - echo "$SETUP_DEPENDENCIES_CONFIG $SETUP_DEPENDENCIES_RUNTIME" | tr ' ' "\n"  > /tmp/B
+          - UNNECESSARY_DEPENDENDCY_SETUP=$( grep -Fxv -f /tmp/B /tmp/A | xargs )
+          - rm -f /tmp/A /tmp/B
+          - "apk del --no-cache $UNNECESSARY_DEPENDENDCY_SETUP"
       
       
   #

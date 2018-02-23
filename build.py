@@ -181,7 +181,11 @@ class Builder():
             for command in process['commands']:
                 if 'shell_condition' in process:
                     commands += "    {row_prefix}".format(row_prefix=row_prefix)
-                    command_suffix = ';\n'
+                    # Add final ; only if necessary
+                    if command.endswith(';'):
+                        command_suffix = '\n'
+                    else:
+                        command_suffix = ';\n'
                 else:
                     commands += commands_prefix
                     command_suffix = '\n'
@@ -194,9 +198,16 @@ class Builder():
             if 'else' in process:
                 else_commands = "else \n    "
                 for else_command in process['else']:
-                    else_commands += "    {else_command}{command_suffix}".format(
+                    else_command_prefix="    "
+                    # Add final ; only if necessary
+                    if else_command.endswith(';'):
+                        else_command_suffix = '\n'
+                    else:
+                        else_command_suffix = ';\n'
+                    else_commands += "{else_command_prefix}{else_command}{else_command_suffix}".format(
+                                else_command_prefix=else_command_prefix,
                                 else_command=else_command,
-                                command_suffix=command_suffix
+                                else_command_suffix=else_command_suffix
                             )
 
             if 'shell_condition' in process:
@@ -299,15 +310,26 @@ class Builder():
         export_var('DOCKERFILE_BUILDER_CACHE_DOCKER_IMAGES', os.path.expandvars(' '.join(self.conf['cache']['docker_images'])))
         
         # GENERATE USERS AND GROUPS
-        template="imports_docker_config_users_groups"
-        generate_users_and_groups_process = get_command_output(
+        template="alpine_config_users_groups"
+        alpine_config_users_groups_process = get_command_output(
             "cat {builder_path}/{template_folder}/{template_key}".format(
                 builder_path=GLOBALS['locations']['dockerfile-builder'],
                 template_folder=self.conf['builder']['folders']['templates'],
                 template_key=self.conf['builder']['templates'][template]
             )
         )
-        export_var('DOCKERFILE_BUILDER_GENERATE_USERS_AND_GROUPS_PROCESS', generate_users_and_groups_process)
+        export_var('DOCKERFILE_BUILDER_ALPINE_CONFIGURE_USERS_AND_GROUPS_PROCESS', alpine_config_users_groups_process)
+        
+        # Hardening
+        template="alpine_hardening"
+        alpine_hardening_processes = get_command_output(
+            "cat {builder_path}/{template_folder}/{template_key}".format(
+                builder_path=GLOBALS['locations']['dockerfile-builder'],
+                template_folder=self.conf['builder']['folders']['templates'],
+                template_key=self.conf['builder']['templates'][template]
+            )
+        )
+        export_var('DOCKERFILE_BUILDER_ALPINE_HARDENING', alpine_hardening_processes)
         
     def build_project_env(self):
         os.environ['PROJECT_TITLE'] = self.conf['project']['title']

@@ -14,15 +14,17 @@ fi
 echo "### Starting container configuration"
 echo "running_config" > $CONFIG_PATHS_CONTAINER_STATUS
 
-${DOCKERFILE_BUILDER_GENERATE_USERS_AND_GROUPS_PROCESS}
+${DOCKERFILE_BUILDER_ALPINE_CONFIGURE_USERS_AND_GROUPS_PROCESS}
 
 #
-# Configurations
+# Run custom configurations
 #
 for config_script in ${BUILDER_TARGETS_FOLDERS_CONTAINER_CONFIG}/*; 
 do
     $config_script 1>/dev/stdout 2>/dev/stderr; 
 done;
+
+${DOCKERFILE_BUILDER_ALPINE_HARDENING}
 
 # End configuration
 echo "ready" > $CONFIG_PATHS_CONTAINER_STATUS
