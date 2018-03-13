@@ -2,29 +2,29 @@
 
 Dockerfile builder script wrote in Python3
 
-- Uses the "build > setup > config > test > push" pattern 
-   + To automate and test builds with a few easy commands:
-	* bin/build
-	* bin/test
-	* bin/push
-   + To run faster tests
-	* bin/cache_warm
-   + To test manually the image
-	* bin/test_container
-   + to build different versions of an image
-	* bin/deploy_branches (deploy changes from master to other branches (git anti-pattern) )
+- Uses the "build > setup > config > test > push" pattern
+  + To automate and test builds with a few easy commands:
+    * bin/build
+    * bin/test
+    * bin/push
+  + To run faster tests
+    * bin/cache_warm
+  + To test manually the image
+    * bin/test_container
+  + to build different versions of an image
+    * bin/deploy_branches (deploy changes from master to other branches (git anti-pattern) )
 
 - Permits inheritance between builds
-   + Run all configuration scripts at container start -> See `docker-config` script or `template/docker-config`
-   + ( ex: if the service running in the container need configuration on the fly (at container start) all images that build on top will configure at same stage: before service run)
+  + Run all configuration scripts at container start -> See `docker-config` script or `template/docker-config`
+  + ( ex: if the service running in the container need configuration on the fly (at container start) all images that build on top will configure at same stage: before service run)
 
 - Get rediness and liveness script kubernetes friendly Out-of-the-box
-   + Check `imports/docker-rediness-test` in the image or `docker-rediness-test` inside the container
-   + Check `imports/docker-liveness-test` in the image or `docker-liveness-test` inside the container
+  + Check `imports/docker-rediness-test` in the image or `docker-rediness-test` inside the container
+  + Check `imports/docker-liveness-test` in the image or `docker-liveness-test` inside the container
 
 - Hardened alpine image out-of-the-box (in-progress)
-   + Remove useless potentially dangerous script after container configuration
-   + Let you specify user and groups used in the container
+  + Remove useless potentially dangerous script after container configuration
+  + Let you specify user and groups used in the container
 
 ## Install
 ~~~
